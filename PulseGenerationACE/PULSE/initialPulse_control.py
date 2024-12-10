@@ -42,6 +42,8 @@ class Pulse_Generator():
         self.pulse_powers = []
         self.pulse_phases = []
         self.pulse_kind = []
+        self.pulse_time_shift = []
+        self.pulse_frequency_shift = []
         self.name = name
         
         self.open_gui = open_gui
@@ -54,18 +56,33 @@ class Pulse_Generator():
             
             self.pulse_object = pg.PulseGenerator(t0=self.t0, tend=self.t_end, dt=self.dt, central_wavelength=self.central_wavelength)
         else:
-            self.central_wavelength = initial_pulse.central_wavelength
-            self.t0 = initial_pulse.t0
-            self.t_end = initial_pulse.tend
-            self.dt = initial_pulse.dt
+            if type(initial_pulse) is not list:
+                initial_pulse = [initial_pulse]
+            self.central_wavelength = initial_pulse[0].central_wavelength
+            self.t0 = initial_pulse[0].t0
+            self.t_end = initial_pulse[0].tend
+            self.dt = initial_pulse[0].dt
             
-            self.pulse_object = initial_pulse.copy_pulse()
-        
-        self.initial_pulse_object = initial_pulse
+            self.pulse_object = initial_pulse[0].copy_pulse()
+            self.pulse_object.clear_all()
+
+            for pulse in initial_pulse:
+                self.pulse_list.append(pulse)
+                self.pulse_args.append(None)
+                self.pulse_pol.append(None)
+                self.pulse_powers.append(pulse.pulse_power)
+                self.pulse_phases.append([pulse.central_wavelength,0,0,0,0])
+                self.pulse_time_shift.append(0)
+                self.pulse_frequency_shift.append(0)
+                self.pulse_kind.append('initial_pulse')
+                
+            
+        self.initial_pulse_object = None #initial_pulse #<- stupid fix? 
         
         
         self.pulse_kinds = ['gaussian_time',
-                            'gaussian_frequency']
+                            'gaussian_frequency',
+                            'from file']
         
         if self.open_gui:
             self.gui()
@@ -124,6 +141,18 @@ class Pulse_Generator():
         else:
             self.pulse_phases[index] = phase
     
+    def add_pulse_time_shift(self, time_shift, index = None):
+        if index is None:
+            self.pulse_time_shift.append(time_shift)
+        else:
+            self.pulse_time_shift[index] = time_shift
+            
+    def add_pulse_frequency_shift(self, frequency_shift, index = None):
+        if index is None:
+            self.pulse_frequency_shift.append(frequency_shift)
+        else:
+            self.pulse_frequency_shift[index] = frequency_shift
+    
     def add_pulse_kind(self, kind, index = None):
         if index is None:
             self.pulse_kind.append(kind)
@@ -148,7 +177,10 @@ class Pulse_Generator():
         self.pulse_pol.pop(index)
         self.pulse_powers.pop(index)
         self.pulse_phases.pop(index)
+        self.pulse_time_shift.pop(index)
+        self.pulse_frequency_shift.pop(index)
         self.pulse_kind.pop(index)
+        
     
     def reset_pulse_list(self):
         self.pulse_list = []
@@ -156,6 +188,8 @@ class Pulse_Generator():
         self.pulse_pol = []
         self.pulse_powers = []
         self.pulse_phases = []
+        self.pulse_time_shift = []
+        self.pulse_frequency_shift = []
         self.pulse_kind = []
 
     def reset_pulse_object(self):
@@ -197,6 +231,8 @@ class Pulse_Generator():
         self.add_pulse_power(power,index)
         self.add_pulse_phase(phase_args,index)
         #self.pulse_kind.append('gaussian_time')
+        self.add_pulse_time_shift(0,index)
+        self.add_pulse_frequency_shift(0,index)
         self.add_pulse_kind('gaussian_time',index)
     
     def add_gaussian_frequency(self, args, pol = [1,0], phase_args = [0,0], power = 1, index = None):
@@ -218,7 +254,26 @@ class Pulse_Generator():
         self.add_pulse_pol(pol,index)
         self.add_pulse_power(power,index)
         self.add_pulse_phase(phase_args,index)
+        self.add_pulse_time_shift(0,index)
+        self.add_pulse_frequency_shift(0,index)
         self.pulse_kind.append('gaussian_frequency')
+        pass
+    
+    def add_initial_pulse(self,index):
+        pulse = self.pulse_list[index]
+        pulse.shift_in_frequency(unit = 'nm', shift = self.pulse_frequency_shift[index])
+        pulse.shift_in_time(self.pulse_time_shift[index])
+        pulse.set_pulse_power(self.pulse_powers[index])
+        pulse = self.add_phase(pulse, self.pulse_phases[index][0], self.pulse_phases[index][1:])
+        self.add_pulse(pulse,index)
+        self.add_pulse_kind('initial_pulse',index)
+        self.add_pulse_args(None,index)
+        self.add_pulse_pol([1,0],index)
+        self.add_pulse_power(pulse.pulse_power,index)
+        self.add_pulse_phase(self.pulse_phases[index],index)
+        self.add_pulse_time_shift(self.pulse_time_shift[index],index)
+        self.add_pulse_frequency_shift(self.pulse_frequency_shift[index],index)
+        
         pass
     
    ### Gui ###
@@ -302,10 +357,8 @@ class Pulse_Generator():
     def pulse_gui(self,pulse_kind, args = None, pol = None, phase_args = None, power = None, index = None):
         self.pulse_window = tk.Toplevel(self.gui_window)
         
-        if len(phase_args) < 5: 
-            for i in range(5-len(phase_args)):
-                phase_args.append(0)
-            #general settings
+        
+        #general settings
         self.label4 = tk.Label(self.pulse_window, text='Polarisation [h,v]: ')
         self.label4.grid(row=0, column=2)
         self.pol_entry_x = tk.Entry(self.pulse_window)
@@ -351,6 +404,9 @@ class Pulse_Generator():
             self.power_entry.insert(0, str(power))
         self.power_entry.grid(row=3+number_taylor, column=3)
         
+        
+        
+        
         self.add_pulse_kind_button = tk.Button(self.pulse_window, text = 'Update pulse')
         self.add_pulse_kind_button.grid(row=3+number_taylor+1, column=2)
         
@@ -362,14 +418,16 @@ class Pulse_Generator():
             self.label1.grid(row=0, column=0)
             args_list_entry.append(tk.Entry(self.pulse_window))
             args_list_entry[0].grid(row=0, column=1)
-            # if args is not None:
-            #     args_list_entry[0].insert(0, str(args[0]))
-            
+            args_list_entry[0].delete(0, tk.END)
+            if args is None:
+                args_list_entry[0].insert(0, str(self.central_wavelength))
             
             self.label2 = tk.Label(self.pulse_window, text='t0 (ps): ')
             self.label2.grid(row=1, column=0)
             args_list_entry.append(tk.Entry(self.pulse_window))
             args_list_entry[1].grid(row=1, column=1)
+            if args is None:
+                args_list_entry[1].insert(0, str((self.t_end - self.t0)/2))
             # if args is not None:
             #     args_list_entry[1].insert(0, str(args[1]))
             
@@ -377,6 +435,8 @@ class Pulse_Generator():
             self.label3.grid(row=2, column=0)
             args_list_entry.append(tk.Entry(self.pulse_window))
             args_list_entry[2].grid(row=2, column=1)
+            if args is None:
+                args_list_entry[2].insert(0, str(np.abs((self.t_end-self.t0))/10))
             # if args is not None:
             #     args_list_entry[2].insert(0, str(args[2]))
             
@@ -388,43 +448,28 @@ class Pulse_Generator():
                                                                   float(self.power_entry.get()),index = index), self.update_gui(), self.pulse_window.destroy()])
             
         elif pulse_kind == 'gaussian_frequency':
-            # self.pulse_window.title('Add Gaussian Frequency')
-            # self.label1 = tk.Label(self.pulse_window, text='Central Wavelength (nm): ')
-            # self.label1.grid(row=0, column=0)
-            # args_list_entry.append(tk.Entry(self.pulse_window))
-            # args_list_entry[0].grid(row=0, column=1)
-            
-            # self.label2 = tk.Label(self.pulse_window, text='t0 (ps): ')
-            # self.label2.grid(row=1, column=0)
-            # args_list_entry.append(tk.Entry(self.pulse_window))
-            # args_list_entry[1].grid(row=1, column=1)
-            
-            # self.label3 = tk.Label(self.pulse_window, text='fwhm (nm): ')
-            # self.label3.grid(row=2, column=0)
-            # args_list_entry.append(tk.Entry(self.pulse_window))
-            # args_list_entry[2].grid(row=2, column=1)
-            
+            self.pulse_window.title('Add Gaussian Frequency')
             self.label1 = tk.Label(self.pulse_window, text='Central Wavelength (nm): ')
             self.label1.grid(row=0, column=0)
             args_list_entry.append(tk.Entry(self.pulse_window))
             args_list_entry[0].grid(row=0, column=1)
-            # if args is not None:
-            #     args_list_entry[0].insert(0, str(args[0]))
+            if args is None:
+                args_list_entry[0].insert(0, str(self.central_wavelength))
             
             
             self.label2 = tk.Label(self.pulse_window, text='t0 (ps): ')
             self.label2.grid(row=1, column=0)
             args_list_entry.append(tk.Entry(self.pulse_window))
             args_list_entry[1].grid(row=1, column=1)
-            # if args is not None:
-            #     args_list_entry[1].insert(0, str(args[1]))
+            if args is None:
+                args_list_entry[1].insert(0, str((self.t_end - self.t0)/2))
             
             self.label3 = tk.Label(self.pulse_window, text='fwhm (nm): ')
             self.label3.grid(row=2, column=0)
             args_list_entry.append(tk.Entry(self.pulse_window))
             args_list_entry[2].grid(row=2, column=1)
-            # if args is not None:
-            #     args_list_entry[2].insert(0, str(args[2]))
+            if args is None:
+                args_list_entry[2].insert(0, str(np.abs((min(self.pulse_object.wavelengths)-max(self.pulse_object.wavelengths))/10)))
             
         
             
@@ -433,10 +478,25 @@ class Pulse_Generator():
                                                                   [float(self.phase_entry_wl.get()), float(self.phase_entry[0].get()), float(self.phase_entry[1].get()), float(self.phase_entry[2].get()), float(self.phase_entry[3].get())],
                                                                   float(self.power_entry.get()),index = index), self.update_gui(), self.pulse_window.destroy()])
             
+        elif pulse_kind == 'initial_pulse':
+            self.pulse_window.title('Modify initial pulse')
+
+            tk.Label(self.pulse_window, text='Shift time (ps): ').grid(row=0, column=0)
+            self.time_shift_entry = tk.Entry(self.pulse_window)
+            self.time_shift_entry.insert(0, str(self.pulse_time_shift[index]))
+            self.time_shift_entry.grid(row=0, column=1)
+            
+            tk.Label(self.pulse_window, text='Shift frequency (nm): ').grid(row=1, column=0)
+            self.frequency_shift_entry = tk.Entry(self.pulse_window)
+            self.frequency_shift_entry.insert(0, str(self.pulse_frequency_shift[index]))
+            self.frequency_shift_entry.grid(row=1, column=1)
             
             
             
-        
+            self.add_pulse_kind_button.config(command= lambda: [self.pulse_list[index].shift_in_frequency(unit = 'nm', shift = float(self.frequency_shift_entry.get())),self.pulse_list[index].shift_in_time(float(self.time_shift_entry.get())),self.add_pulse_power(float(self.power_entry.get()),index),self.pulse_list[index].set_pulse_power(float(self.power_entry.get())),self.add_phase(self.pulse_list[index], float(self.phase_entry_wl.get()), [float(self.phase_entry[0].get()), float(self.phase_entry[1].get()), float(self.phase_entry[2].get()), float(self.phase_entry[3].get())]), self.update_gui(), self.add_initial_pulse(index=index),self.pulse_window.destroy()])
+            
+            # 
+            
         if args is not None:
             for i in range(len(args)):
                 args_list_entry[i].insert(0, str(args[i]))
@@ -560,11 +620,11 @@ if __name__ == '__main__':
     
     qd_calibration = 'QD_Iker_April_high_fss.txt' 
     initial_pulse = pg.PulseGenerator(0,50,0.2,calibration_file=qd_calibration)
-    initial_pulse.add_gaussian_time(unit = 'nm', central_f= 779.89, width_t=0.1,t0=50/2,area_time=20, polarisation=[1,0.6]) # <-- more power for tpe 
+    initial_pulse.add_gaussian_time(unit = 'nm', central_f= 779.89, width_t=5,t0=50/2,area_time=20, polarisation=[1,0.6]) # <-- more power for tpe 
     
-    ic = Pulse_Generator(open_gui=False, t_end=250,initial_pulse=None)
+    ic = Pulse_Generator(open_gui=False, t_end=250,initial_pulse=initial_pulse)
     
-    ic.add_gaussian_time([802, 30, 10],pol=[0,1],phase_args=[800.5,0,0,0],power=50)
+    #ic.add_gaussian_time([802, 30, 10],pol=[0,1],phase_args=[800.5,0,0,0],power=50)
     
     #ic.add_gaussian_time([800, 20, 10],pol=[1,0],phase_args=[778,0,0,0],power=100)
     

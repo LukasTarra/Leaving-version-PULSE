@@ -1149,6 +1149,23 @@ class PulseGenerator:
     #     wigner_x = integrate.quad(wigner_integrand_x,self.t0,self.tend)
     #     wigner_y = integrate.quad(wigner_integrand_y,self.t0,self.tend)
     #     return wigner_x[0], wigner_y[0]
+    
+    def shift_in_time(self,shift):
+        # shifts the pulse in time 
+        field_x = np.roll(self.temporal_representation_x,int(shift/self.dt))
+        field_y = np.roll(self.temporal_representation_y,int(shift/self.dt))
+        
+        self.clear_all()
+        self._add_time(field_x,field_y)
+        
+    def shift_in_frequency(self,shift, unit = 'Hz'):
+        # shifts the pulse in frequency 
+        shift = -self._Units(shift,unit)
+        field_x = np.roll(self.frequency_representation_x,int(shift/self.df))
+        field_y = np.roll(self.frequency_representation_y,int(shift/self.df))
+        
+        self.clear_all()
+        self._add_spectral(field_x,field_y)
 
     def generate_pulsefiles(self, temp_dir = '', file_name = 'pulse_time', suffix = '',abs_only = False, precision = 8):
         #Translating the generated pulse for use with the PYACEQD Quantum Dot simulation enviroment 
@@ -1176,7 +1193,7 @@ class PulseGenerator:
 
         return phase_file_x, phase_file_y
 
-    def generate_field_functions(self, interpolation = 'linear'):
+    def generate_field_functions(self, interpolation = 'cubic'):
         #generate a function that can be used by qutip (ect) and interpolates accordingly 
         field_x = interpolate.interp1d(self.time, self.temporal_representation_x, kind=interpolation, fill_value=0,bounds_error=False)
         field_y = interpolate.interp1d(self.time, self.temporal_representation_y, kind=interpolation, fill_value=0,bounds_error=False)
@@ -1186,6 +1203,17 @@ class PulseGenerator:
         #     return field_y(t)
     
         return field_x, field_y 
+    
+    def generate_frequency_functions(self, interpolation = 'cubic'):
+        #generate a function that can be used by qutip (ect) and interpolates accordingly 
+        field_x = interpolate.interp1d(self.frequencies, self.frequency_representation_x, kind=interpolation, fill_value=0,bounds_error=False)
+        field_y = interpolate.interp1d(self.frequencies, self.frequency_representation_y, kind=interpolation, fill_value=0,bounds_error=False)
+        # def field_function_x(f):
+        #     return field_x(f)
+        # def field_function_y(f):
+        #     return field_y(f)
+    
+        return field_x, field_y
     
     def generate_field_functions_lab_frame(self):
         # interpolates the field functions in the lab frame 

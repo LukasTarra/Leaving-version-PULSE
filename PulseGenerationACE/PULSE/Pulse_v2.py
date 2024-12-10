@@ -1568,11 +1568,12 @@ def pulse_time_delay(pulse_object, time_delay, central_wavelength = None):
     if central_wavelength is None: 
         central_wavelength = pulse_object.central_wavelength
     pulse_object.clear_filter()
-    pulse_object.add_filter_rectangle()
-    lin_phase = time_delay 
-    pulse_object.add_phase_filter(central_f = central_wavelength, phase_taylor=[0,lin_phase], polarisation = 'b',unit = 'nm',f_start = None, f_end = None)
-    pulse_object.apply_frequency_filter()
-    pulse_object.clear_filter()
+    pulse_object.shift_in_time(time_delay)
+    # pulse_object.add_filter_rectangle()
+    # lin_phase = time_delay 
+    # pulse_object.add_phase_filter(central_f = central_wavelength, phase_taylor=[0,lin_phase], polarisation = 'b',unit = 'nm',f_start = None, f_end = None)
+    # pulse_object.apply_frequency_filter()
+    # pulse_object.clear_filter()
     return pulse_object
 
 def _interpolate_pulse_to_spectrum(pulse, spectrum_wavelength,polarisation = 'both',intensity = True):

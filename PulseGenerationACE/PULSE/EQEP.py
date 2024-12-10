@@ -7,6 +7,7 @@ from Pulse_v2 import fake_spectrometer, fake_motor, pulse_shaper_obj, simulator,
 
 import control_optimizer as con_opt
 import hyper_dimensional_scan as hds
+import initialPulse_control as ip
 import sys
 from PULSE_gui_tools import gui_manager 
 
@@ -66,9 +67,10 @@ initial_pulse_B = chirp_filter(initial_pulse_B, chirp_B, central_wavelength=init
 
 # ---- pulse generator controls -----
 
-
+ipA_control = ip.Pulse_Generator(initial_pulse = initial_pulse_A, name='initial_pulse_A')
+ipB_control = ip.Pulse_Generator(initial_pulse = initial_pulse_B, name='initial_pulse_B')
 # ----- pulse shaper A -----
-ps_control_A = pulse_shaper_A.open_control(pulse_object=initial_pulse_A,open_gui=False)
+ps_control_A = pulse_shaper_A.open_control(previous_control=ipA_control,open_gui=False)
 ps_control_A.set_control_value(initial_wavelength_A)
 ps_control_A.update_control()
 ps_control_A.set_step_size(0.025)
@@ -76,7 +78,7 @@ ps_control_A.gui()
 att_control_A = attenuator_A.open_control(previous_control=ps_control_A)
 
 # ----- pulse shaper B -----
-ps_control_B = pulse_shaper_B.open_control(pulse_object=initial_pulse_B,open_gui=False)
+ps_control_B = pulse_shaper_B.open_control(previous_control=ipB_control,open_gui=False)
 ps_control_B.set_control_value(initial_wavelength_B)
 ps_control_B.update_control()
 ps_control_B.set_step_size(0.025)
@@ -133,7 +135,7 @@ optimizer = con_opt.control_optimizer(device_control=[ps_control_A,att_control_A
 scanner = hds.hyper_scan(device_control=[ps_control_A,att_control_A, ps_control_B, att_control_B, delay_control_C], measururement_control=[spectrometer_control_M1, power_meter_control_M2, power_meter_control_M3])
 
 # ------ gui manager --------
-manager = gui_manager(device_control=[ps_control_A, att_control_A, sim_control,ps_control_B, att_control_B, sim_control2, delay_control_C,  spectrometer_control_M1, power_meter_control_M2, power_meter_control_M3, optimizer,scanner], num_coloums=3)
+manager = gui_manager(device_control=[ps_control_A, att_control_A, sim_control,ps_control_B, att_control_B, sim_control2, delay_control_C,  spectrometer_control_M1, power_meter_control_M2, power_meter_control_M3, optimizer,scanner, ipA_control, ipB_control], num_coloums=3)
 
 
 

@@ -105,7 +105,9 @@ def aquire_data():
     motor_step.grid(row=2, column=1)
 
     def load_folder():
+        
         old_dir = os.getcwd()
+        enable_gui()
         folder = tk.filedialog.askdirectory()
         os.chdir(folder)
         files = os.listdir(folder)
@@ -130,18 +132,21 @@ def aquire_data():
         ax.set_ylim([0, np.max(COUNTS_ENV)*1.1])
         canvas.draw()
         slider_slice.config(from_=float(motor_min.get()), to=float(motor_max.get()), resolution=np.abs(MO_POS[1]-MO_POS[0]))
-
+        slider_slice.set(np.mean([float(motor_min.get()),float(motor_max.get())]))
+        
         os.chdir(old_dir)
         xlim_min.delete(0, tk.END)
         xlim_max.delete(0, tk.END)
         xlim_min.insert(0, str(np.round(np.min(WL_MAT[0,:]),decimals=2)))
         xlim_max.insert(0, str(np.round(np.max(WL_MAT[0,:]),decimals=2)))
-        num_slices.config(from_=1, to = len(MO_POS), resolution=1)
+        num_slices.config(from_=2, to = len(MO_POS), resolution=1)
         separation_slices.delete(0, tk.END)
-        separation_slices.insert(0,string=str(np.round(3*np.abs(MO_POS[1]-MO_POS[0]),decimals=2)))
+        separation_slices.insert(0,string=str(np.round(6*np.abs(MO_POS[1]-MO_POS[0]),decimals=2)))
+        
         aquire_window.destroy()
 
     def _aquire():
+        enable_gui()
         min = float(motor_min.get())
         max = float(motor_max.get())
         step = float(motor_step.get())
@@ -172,13 +177,15 @@ def aquire_data():
         canvas.draw()
 
         slider_slice.config(from_=min, to=max, resolution=step)
+        slider_slice.set(np.mean([min,max]))
         xlim_min.delete(0, tk.END)
         xlim_max.delete(0, tk.END)
         xlim_min.insert(0, str(np.round(np.min(WL_MAT[0,:]),decimals=2)))
         xlim_max.insert(0, str(np.round(np.max(WL_MAT[0,:]),decimals=2)))
-        num_slices.config(from_=1, to = len(MO_POS), resolution=1)
+        num_slices.config(from_=2, to = len(MO_POS), resolution=1)
         separation_slices.delete(0, tk.END)
-        separation_slices.insert(0,string=str(np.round(3*step,decimals=2)))
+        separation_slices.insert(0,string=str(np.round(6*step,decimals=2)))
+        
         aquire_window.destroy()
 
     
@@ -463,11 +470,11 @@ connected_motor_text = tk.Label(root, text="Motor connected: "+MOTOR.name)
 
 slider_slice = tk.Scale(root, from_=0, to=1, orient=tk.HORIZONTAL,
                                command=draw_slice,label="motor position",resolution=0.1,length=300)
-num_slices = tk.Scale(root, from_=1, to = 10, orient=tk.HORIZONTAL,
-                               command = draw_slice,label="number of slices",resolution=1,length=300)
+num_slices = tk.Scale(root, from_=2, to = 10, orient=tk.HORIZONTAL,
+                               command = draw_slice,resolution=1,length=300)
 separation_slices = tk.Entry(root, text="Separation between slices")
 #separation_slices.insert()
-num_slices.set(1)
+num_slices.set(2)
 
 xlim_min = tk.Entry(root)
 xlim_max = tk.Entry(root)
@@ -476,18 +483,60 @@ xlim_max = tk.Entry(root)
 aquire_button = tk.Button(root, text="Aquire data", command=aquire_data)
 start_cal_button = tk.Button(root, text="Start calibration", command=start_calibration)
 
-start_cal_button.pack(side=tk.TOP)
-#connect_spectrometer.pack(side=tk.TOP)
-#connect_motor.pack(side=tk.TOP)
-connected_spectrometer_text.pack(side=tk.TOP)
-connected_motor_text.pack(side=tk.TOP)
-aquire_button.pack(side=tk.TOP)
-canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-slider_slice.pack(side=tk.BOTTOM)
-xlim_max.pack(side=tk.BOTTOM)
-xlim_min.pack(side=tk.BOTTOM)
-num_slices.pack(side=tk.BOTTOM)
-separation_slices.pack(side=tk.BOTTOM)
+# start_cal_button.pack(side=tk.TOP)
+# #connect_spectrometer.pack(side=tk.TOP)
+# #connect_motor.pack(side=tk.TOP)
+# connected_spectrometer_text.pack(side=tk.TOP)
+# connected_motor_text.pack(side=tk.TOP)
+# aquire_button.pack(side=tk.TOP)
+# canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+# slider_slice.pack(side=tk.BOTTOM)
+# xlim_max.pack(side=tk.BOTTOM)
+# xlim_min.pack(side=tk.BOTTOM)
+# num_slices.pack(side=tk.BOTTOM)
+# separation_slices.pack(side=tk.BOTTOM)
+
+aquire_button.grid(row=0, column=0)
+start_cal_button.grid(row=0, column=1)
+start_cal_button.config(state=tk.DISABLED)
+aquire_button.grid(row=0, column=0)
+
+connected_spectrometer_text.grid(row=1, column=0,columnspan=2)
+connected_motor_text.grid(row=2, column=0, columnspan=2)
+canvas.get_tk_widget().grid(row=3, column=0, columnspan=2)
+
+tk.Label(root, text = 'Calibration min (nm): ').grid(row=4, column=0)
+xlim_min.grid(row=4, column=1)
+xlim_min.config(state=tk.DISABLED)
+
+tk.Label(root, text = 'Calibration max (nm): ').grid(row=5, column=0)
+xlim_max.grid(row=5, column=1)
+xlim_max.config(state=tk.DISABLED)
+
+tk.Label(root, text = 'Slice separation: ').grid(row=6, column=0)
+separation_slices.grid(row=6, column=1)
+separation_slices.config(state=tk.DISABLED)
+
+tk.Label(root, text = 'Number of slices: ').grid(row=7, column=0)
+num_slices.grid(row=7, column=1)
+num_slices.config(state=tk.DISABLED)
+
+tk.Label(root, text = 'Center slice: ').grid(row=8, column=0)
+slider_slice.grid(row=8, column=1)
+slider_slice.config(state=tk.DISABLED)
+
+
+def enable_gui():
+    start_cal_button.config(state=tk.NORMAL)
+    aquire_button.config(state=tk.NORMAL)
+    xlim_min.config(state=tk.NORMAL)
+    xlim_max.config(state=tk.NORMAL)
+    separation_slices.config(state=tk.NORMAL)
+    num_slices.config(state=tk.NORMAL)
+    slider_slice.config(state=tk.NORMAL)
+    
+    
+
 
 tk.mainloop()
 
