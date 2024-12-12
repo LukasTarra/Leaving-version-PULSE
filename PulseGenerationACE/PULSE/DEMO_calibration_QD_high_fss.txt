@@ -1,0 +1,19 @@
+[EMISSION]
+exciton_wavelength = 779.89
+biexciton_wavelength = 781.79
+dark_wavelength = 779.81
+
+[SPLITTING]
+fss_bright = 200
+fss_dark = 0
+
+[LIFETIMES]
+exciton = 180
+biexciton = 90
+
+[G_FACTORS]
+g_ex = 0
+g_ez = 0
+g_hx = 0
+g_hz = 0
+

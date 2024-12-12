@@ -389,7 +389,7 @@ class Pulse_Generator():
         number_taylor = 4
         self.phase_entry = []
         for i in range(number_taylor):
-            tk.Label(self.pulse_window, text='taylor '+str(i)+': ').grid(row=3+i, column=2)
+            tk.Label(self.pulse_window, text='taylor '+str(i)+' (ps^'+str(i)+'): ').grid(row=3+i, column=2)
             self.phase_entry.append(tk.Entry(self.pulse_window))
             self.phase_entry[i].grid(row=3+i, column=3)
             if phase_args is None:

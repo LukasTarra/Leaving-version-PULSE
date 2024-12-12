@@ -59,6 +59,14 @@ class gui_manager():
         
         self.gui_window.title('GUI manager')
         
+        # when closing the window it closes all connected control windows 
+        def close_windows():
+            for i in self.device_control:
+                i.gui_window.destroy()
+            self.gui_window.destroy()
+            
+        self.gui_window.protocol("WM_DELETE_WINDOW", close_windows)
+        
         self.num_rows = int(np.ceil(self.num_devices/self.num_coloums))
         
         self.name_label_list = [] 
