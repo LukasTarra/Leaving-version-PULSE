@@ -102,11 +102,13 @@ class powermeter_control:
                 pulse_list.append(self.previous_control[j].get_pulse_object())
                 #print('shaper: '+ self.previous_control[j].pulse_shaper_object.name)
                 #print(self.previous_control[j].get_pulse_object().pulse_power)
-            self.pulse_object = pulse_list[0].copy_pulse()
-        
-            for i in range(len(pulse_list)-1): 
-                #print(i+1)
-                self.pulse_object.merge_pulses(pulse_list[i+1])
+            
+            if pulse_list[0] is not None:
+                self.pulse_object = pulse_list[0].copy_pulse()
+            
+                for i in range(len(pulse_list)-1): 
+                    #print(i+1)
+                    self.pulse_object.merge_pulses(pulse_list[i+1])
                 
         elif self.previous_control is not None:
             if self.open_gui:
@@ -141,8 +143,10 @@ class powermeter_control:
         
         if self.current_power_experiment > self.max_power_experiment:
             self.max_power_experiment = self.current_power_experiment
-        if self.current_power_pulse > self.max_power_pulse:
-            self.max_power_pulse = self.current_power_pulse
+        
+        if self.pulse_object is not None:
+            if self.current_power_pulse > self.max_power_pulse:
+                self.max_power_pulse = self.current_power_pulse
         
         #self.power_experiment_vector.append(self.current_power_experiment)
         #self.power_pulse_vector.append(self.current_power_pulse)
@@ -290,9 +294,14 @@ class powermeter_control:
         
         self.running_experiment_button = tk.Button(self.gui_window, text='Run Experiment', command= lambda: [self.toggle_running_experiment(), self.button_color(self.running_experiment_button, self.running_experiment), self.update_gui()])
         self.running_experiment_button.grid(row=4, column=1)
+        self.button_color(self.running_experiment_button, self.running_experiment)
         
         self.running_pulse_button = tk.Button(self.gui_window, text='Run Pulse', command= lambda: [self.toggle_running_pulse(), self.button_color(self.running_pulse_button, self.running_pulse), self.update_gui()])
         self.running_pulse_button.grid(row=4, column=2)
+        self.button_color(self.running_pulse_button, self.running_pulse)
+        
+        if self.pulse_object is None:
+            self.running_pulse_button.config(state='disabled')
         
         self.update_gui()
     

@@ -49,6 +49,7 @@ class gui_manager():
         
         self.open_gui = open_gui
         
+        
         if self.open_gui:
             self.gui()
         
@@ -62,7 +63,8 @@ class gui_manager():
         # when closing the window it closes all connected control windows 
         def close_windows():
             for i in self.device_control:
-                i.gui_window.destroy()
+                # only destroy if the window is not already destroyed
+                i.gui_window.destroy
             self.gui_window.destroy()
             
         self.gui_window.protocol("WM_DELETE_WINDOW", close_windows)
@@ -118,6 +120,8 @@ class gui_manager():
             else:
                 self.collapse_gui(index)
             
+            #device.gui_window.protocol("WM_DELETE_WINDOW",lambda: [device.gui_window.withdraw(), button_color(self.toggle_button_list[i], self.gui_window_state[i])])
+            controller.gui_window.protocol("WM_DELETE_WINDOW", lambda controller_index = index: self.toggle_gui(controller_index))
         self.num_devices = len(self.device_control)
             
     
