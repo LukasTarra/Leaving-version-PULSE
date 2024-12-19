@@ -34,6 +34,7 @@ import attenuator_control as atc
 import simulator_control as simc
 import time_delay_control as tdc
 import powermeter_control as pmc
+import wave_plate_control as wpc
 
 HBAR = 0.6582173
 
@@ -136,23 +137,30 @@ class time_delay():
         self.device.close()
 
 class attenuator():
-    def __init__(self,device=None,name='Attenuator',save = False,experiment = None,attenuator_sleep = 0) -> None:
+    def __init__(self,device=None,name='Attenuator',save = False,experiment = None,attenuator_sleep = 0, command = 'set_attenuation') -> None:
         self.name = name
         self.device = device
         self.time_of_creation = datetime.now()
         self.suffix = 'at'
         self.attenuator_sleep = attenuator_sleep
         self.current_attenuation = 0
+        self.command = command
+        
         self.print_info()
-        _check_method(device,'set_attenuation')
+        _check_method(device,self.command)
         _check_method(device,'close')
 
         if save:
             save_device(self, self.name,suffix = 'at',experiment = experiment)
-        
+    
+    def device_command(self,position):
+        com = getattr(self.device,self.command)
+        com(position)
+    
     def excecute(self):
         # meant to be called from saved object and excecute device specific functions
-        self.device.set_attenuation(self.attenuation)
+        #self.device.set_attenuation(self.attenuation)
+        self.device_command(self.attenuation)
         sleep(self.attenuator_sleep)
 
     def set_attenuation(self,attenuation=None,pulse_object = None,excecute=False):
@@ -162,7 +170,8 @@ class attenuator():
 
         if excecute and attenuation != self.current_attenuation:
             self.current_attenuation = attenuation
-            self.device.set_attenuation(attenuation) 
+            #self.device.set_attenuation(attenuation) 
+            self.device_command(attenuation)
 
         if pulse_object is not None:
             if type(pulse_object) is str:
@@ -191,7 +200,7 @@ class attenuator():
         
 
 class motor():
-    def __init__(self,device=None,name='Motor',save = False,experiment = None, motor_sleep = 0, min_position = None, max_position = None, command = None) -> None:
+    def __init__(self,device=None,name='Motor',save = False,experiment = None, motor_sleep = 0, min_position = None, max_position = None, command = 'set_position') -> None:
         self.name = name
         self.device = device
         self.time_of_creation = datetime.now()
@@ -199,8 +208,9 @@ class motor():
         self.motor_sleep = motor_sleep
         self.current_position = 0
         self.command = command
+   
         self.print_info()
-        _check_method(device,'set_position')
+        _check_method(device,self.command)
         _check_method(device,'close')
         
         if save:
@@ -217,6 +227,10 @@ class motor():
         else:
             self.max_position = max_position
 
+    def device_command(self,position):
+        com = getattr(self.device,self.command)
+        com(position)
+    
     def set_position(self,position=0,excecute=False):
         
         if position < self.min_position:
@@ -226,7 +240,8 @@ class motor():
         
         if excecute and position != self.current_position:
             self.current_position = position
-            self.device.set_position(position)
+            #self.device.set_position(position)
+            self.device_command(position)
             sleep(self.motor_sleep)
         pass
 
@@ -242,26 +257,32 @@ class motor():
 
 # measurement devices 
 class power_meter():
-    def __init__(self,device=None,name='Power Meter',save = False,experiment = None) -> None:
+    def __init__(self,device=None,name='Power Meter',save = False,experiment = None, command = 'get_power') -> None:
         self.name = name
         self.device = device
         self.time_of_creation = datetime.now()
         self.suffix = 'pm'
         self.print_info()
-        _check_method(device,'get_power')
+        self.command = command  
+        _check_method(device,self.command)
         _check_method(device,'close')
         self.output = [None, # experiment_power
                        None] # pulse_power
         if save:
             save_device(self, self.name,suffix = self.suffix,experiment = experiment)
         pass
-
+    
+    def device_command(self):
+        com = getattr(self.device,self.command)
+        return com()
+    
     def get_power(self,excecute=True, pulse_object = None):
         if excecute:
             if self.name == 'fake':
                 self.output[0] = self.device.get_power(pulse_object)
             else:
-                self.output[0] = self.device.get_power()
+                #self.output[0] = self.device.get_power()
+                self.output[0] = self.device_command()
         
         if pulse_object is not None:
             if type(pulse_object) is str:
@@ -284,18 +305,20 @@ class power_meter():
 
 
 class spectrometer():
-    def __init__(self,device=None,name='Spectrometer',save = False, use_sim_pulse = False, polarisation_angle = None) -> None:
+    def __init__(self,device=None,name='Spectrometer',save = False, use_sim_pulse = False, polarisation_angle = None, command = 'get_spectrum') -> None:
         self.name = name
         self.device = device
         self.time_of_creation = datetime.now()
         self.suffix = 'sp'
+        self.command = command
         self.print_info()
-        _check_method(device,'get_spectrum')
+        _check_method(device,self.command)
         _check_method(device,'close')
         self.output = [[None,None], #exp_wl, exp_counts
                        [None,None], # pul_wl, pul_counts
                         [None,None]] # sim_wl, sim_counts
-        exp_wl, _ =  self.device.get_spectrum()
+        #exp_wl, _ =  self.device.get_spectrum()
+        exp_wl, _ = self.device_command()
         self.exp_wl_0 = exp_wl
         self.use_sim_pulse = use_sim_pulse
         self.central_wavelength = np.mean(exp_wl)
@@ -306,6 +329,11 @@ class spectrometer():
             save_device(self, self.name,suffix = self.suffix)
         pass
     
+    def device_command(self):
+        com = getattr(self.device,self.command)
+        wl, counts = com()
+        return wl, counts
+    
     def set_polarisation(self,polarisation):
         self.polarisation_angle = polarisation
     
@@ -314,7 +342,8 @@ class spectrometer():
     
     def get_spectrum(self,pulse_object= None,sim_object = None,excecute=True):
         if excecute:
-            exp_wl, exp_counts =  self.device.get_spectrum()
+            #exp_wl, exp_counts =  self.device.get_spectrum()
+            exp_wl, exp_counts = self.device_command()
             self.output[0] = [exp_wl, exp_counts]
 
         else:
@@ -698,11 +727,72 @@ class quarter_wave_plate():
     def __init__(self,name = 'QWP') -> None:
         self.name = name
         pass
+    
+class generic_wave_plate():
+    def __init__(self,device = None, name = 'HWP', phase = np.pi, unit = 'deg') -> None:
+        self.device = device
+        self.name = name
+        self.phase = phase
+        self.unit = unit
+    
+    def set_unit(self,unit):
+        self.unit = unit
+    
+    def get_unit(self):
+        return self.unit
+    
+    def set_phase(self,phase):
+        self.phase = phase
+        
+    def get_phase(self):
+        return self.phase
+    
+    def generate_matrix(self,angle = 0):
+        self.wp_mat = np.exp(-1j*self.phase/2)*np.array([[np.cos(angle)**2 + np.exp(1j*self.phase)*np.sin(angle)**2, (1-np.exp(1j*self.phase))*np.cos(angle)*np.sin(angle)],[(1-np.exp(1j*self.phase))*np.cos(angle)*np.sin(angle),np.sin(angle)**2 + np.exp(1j*self.phase)*np.cos(angle)**2]])
+    
+    def rotate(self,pulse_object = None, angle=0, excecute=False):
+        if excecute:
+            #print('To do')
+            pass
+        
+        if pulse_object is not None:
+            if self.unit == 'deg':
+                # range from 0 to 360 degrees
+                angle = np.mod(angle,360)
+                angle = np.deg2rad(angle)
+            elif self.unit == 'rad':
+                angle = np.mod(angle,2*np.pi)
+            
+            self.generate_matrix(angle)
+            if type(pulse_object) is str:
+                 pulse_object = pg.load_pulse(pulse_object)
+            out_pulse_object = pulse_object.copy_pulse()
+            out_pulse_object.clear_all()
+            
+            field_add_x = np.zeros_like(pulse_object.temporal_representation_x).astype(complex)
+            field_add_y = np.zeros_like(pulse_object.temporal_representation_y).astype(complex)
+            for i_temp, field_x in enumerate(pulse_object.temporal_representation_x):
+                field_y = pulse_object.temporal_representation_y[i_temp]
+                field_add_x[i_temp] = np.matmul(self.wp_mat,np.array([field_x,field_y]))[0]
+                field_add_y[i_temp] = np.matmul(self.wp_mat,np.array([field_x,field_y]))[1]
+
+            out_pulse_object._add_time(field_add_x,field_add_y)
+            return out_pulse_object
+    
+    def open_control(self,pulse_object = None,open_gui = True,parent_window = None,previous_control = None):
+       
+        control_object = wpc.waveplate_control(self,pulse_object = pulse_object, open_gui = open_gui,parent_window=parent_window,previous_control= previous_control)
+        return control_object
+    
+        
+    def set_phase(self,phase):
+        self.phase = phase
         
 class linear_polarizer():
-    def __init__(self,name = 'LP', angle = 0) -> None:
+    def __init__(self,name = 'LP', angle = 0, unit = 'deg') -> None:
         self.name = name
         self.angle = angle
+        self.unit = unit
         pass
     
     def set_angle(self,angle):
@@ -714,8 +804,14 @@ class linear_polarizer():
     def rotate(self,pulse_object = None,device = None, angle=None, excecute=False, pol_vector = None):
         if angle is not None:
             self.set_angle(angle)
-        lp_matrix = np.array([[np.cos(self.angle)**2,np.cos(self.angle)*np.sin(self.angle)],
-                               [np.cos(self.angle)*np.sin(self.angle),np.sin(self.angle)**2]])
+        if self.unit == 'deg':
+            # range from 0 to 360 degrees
+            angle = np.mod(self.angle,360)
+            angle = np.deg2rad(self.angle)
+        else:
+            angle = np.mod(self.angle,2*np.pi)
+        lp_matrix = np.array([[np.cos(angle)**2,np.cos(angle)*np.sin(angle)],
+                               [np.cos(angle)*np.sin(angle),np.sin(angle)**2]])
         
         if excecute:
             print('To do')
@@ -740,7 +836,7 @@ class linear_polarizer():
             return np.matmul(lp_matrix,pol_vector)
   
 class simulator():
-    def __init__(self,qd_calibration = None,name = 'Simulator',temp_dir = '', sim_kind = 'ACE', decay = False, phonons = False, dot_size = 5,temperature = 4, hamiltonian = None, photon_pulse_bool = False) -> None:
+    def __init__(self,qd_calibration = None,name = 'Simulator',temp_dir = '', sim_kind = 'ACE', decay = False, phonons = False, dot_size = 5,temperature = 4, hamiltonian = None, photon_pulse_bool = False, dipole_orientation = 0) -> None:
         if qd_calibration is None and hamiltonian is None:
             print('No calibration file provided')
             return None
@@ -759,6 +855,7 @@ class simulator():
         #self.photon_wavelength = [0,0,0,0]
         self.photon_pulse = None
         self.photon_pulse_bool = photon_pulse_bool
+        self.dipole_orientation = dipole_orientation
         if hamiltonian is not None:
             self.hamiltonian = self.read_Hamiltonian(hamiltonian)
         else:
@@ -771,6 +868,7 @@ class simulator():
             elif os.name == 'nt':
                 sim_kind = 'Qutip'
         self.sim_kind = sim_kind
+        self.hwp = generic_wave_plate(name = 'HWP', phase = np.pi, unit = 'deg')
         self.print_info()
         
         
@@ -794,6 +892,15 @@ class simulator():
     def set_qd_calibration(self,qd_calibration):
         self.qd_calibration = qd_calibration
         self.print_info()
+    
+    def set_phonons(self,phonons):
+        self.phonons = phonons
+        
+    def toggle_phonons(self):
+        self.phonons = not self.phonons
+    
+    def set_dipole_orientation(self,dipole_orientation):
+        self.dipole_orientation = dipole_orientation
     
     def get_num_states(self):
         return self.num_states
@@ -846,6 +953,8 @@ class simulator():
 
     def simulate(self,pulse_object,sim_dt = None, dipole_moment = 1, plot = False):
         pulse_object.set_rotating_frame(self.qd_calibration)
+        if self.dipole_orientation != 0:
+            pulse_object = self.hwp.rotate(pulse_object,angle=self.dipole_orientation/2,excecute=False)
         if self.sim_kind.lower() == 'ace':
             self.sim_out = self.ace_four_level(pulse_object,sim_dt,self.decay,self.phonons,plot,dipole_moment)
         
@@ -963,19 +1072,27 @@ class simulator():
         
         return [np.real(t),np.abs(g),np.abs(x),np.abs(y),np.abs(b)]
     
-    def set_ace_six_level(self, b_x = None, bz = None, b_field_frame = False):
+    def set_ace_six_level(self, b_x = None, b_z = None, b_field_frame = False):
         if b_x is not None:
             self.b_x = b_x
         else: 
             self.b_x = 0
-        if bz is not None:
-            self.b_z = bz
+        if b_z is not None:
+            self.b_z = b_z
         else: 
             self.b_z = 0
         self.b_field_frame = b_field_frame
     
+    def set_mag_field(self,b_x,b_z):
+        self.b_x = b_x
+        self.b_z = b_z
     
+    def set_b_field_frame(self,b_field_frame):
+        self.b_field_frame = b_field_frame
         
+    def toggle_b_field_frame(self):
+        self.b_field_frame = not self.b_field_frame
+    
     def ace_six_level(self,pulse_object,sim_dt = None, decay = False, phonons = False,plot = False,dipole_moment = 1):
         
         if type(pulse_object) is str:
@@ -991,12 +1108,11 @@ class simulator():
         n = np.ceil(np.log2(10/sim_dt))
         t_mem = sim_dt*2**n
         pulse_x, pulse_y = sim_pulse_object.generate_pulsefiles(temp_dir=self.temp_dir,precision=8) 
-        
-        ds_t, _, ds_occ, _, rho = sixls_linear_dressed_states(sim_pulse_object.t0,sim_pulse_object.tend,dt=sim_dt,pulse_file_x=pulse_x,pulse_file_y=pulse_y,temp_dir=self.temp_dir, suffix='pulse', initial = '|0><0|_6', rf = False, calibration_file = self.qd_calibration, bx = self.b_x, lindblad = decay) 
+        ds_t, _, ds_occ, _, rho = sixls_linear_dressed_states(sim_pulse_object.t0,sim_pulse_object.tend,dt=sim_dt,pulse_file_x=pulse_x,pulse_file_y=pulse_y,temp_dir=self.temp_dir, suffix='pulse', initial = '|0><0|_6', rf = False, calibration_file = self.qd_calibration, bx = self.b_x, bz = self.b_z, lindblad = decay) 
         
         return_vector = [np.real(ds_t)]
         if self.b_field_frame:
-            rho = self.bx_field_basis_transformation(rho,self.b_x,self.qd_calibration)
+            rho = self.bx_field_basis_transformation(rho,self.b_x,self.qd_calibration, bz=self.b_z)
             for i in [2,1,3,5,0,4]: #range(self.num_states)
                 cur_return = []
                 for j in range(len(ds_t)):
@@ -1017,20 +1133,24 @@ class simulator():
                             # lindblad=False,rf = True, rf_file = ph_x,bx=bx,temperature = 1.5, ae = 5, phonons = False,
                             #  calibration_file=calib_file, make_transparent=[0,2,4])
     
-    def bx_field_basis_transformation(self,rho,bx,calibration_file): 
-        E_X, E_Y, E_S, E_F, E_B, _, _, g_ex, g_hx, _, _ = read_calibration_file(calibration_file)
+    def bx_field_basis_transformation(self,rho,bx,calibration_file, bz = 0): 
+        E_X, E_Y, E_S, E_F, E_B, _, _, g_ex, g_hx, g_ez, g_hz = read_calibration_file(calibration_file)
         mu_b = 5.7882818012e-2   # meV/T
         hbar = 0.6582173  # meV*ps
         A = -0.5*mu_b*bx*(g_ex+g_hx)
         B = -0.5*mu_b*bx*(g_ex-g_hx) 
-
+        
+        C = -1j*0.5*mu_b*bz*(g_ez-3*g_hz)
+        D = 1j*0.5*mu_b*bz*(g_ez+3*g_hz) # -
+        # system_op.append("i*{}*(|1><2|_6 -|2><1|_6)".format(0.5*mu_b*bz*(g_ez-3*g_hz)))
+        # system_op.append("i*{}*(|4><3|_6 - |3><4|_6 )".format(-0.5*mu_b*bz*(g_ez+3*g_hz)))
         bare_state_index = np.argsort([0,E_X,E_Y,E_S,E_F,E_B])
 
         H = np.array([[0,0,0,0,0,0],
-                    [0,E_X,0,A,0,0],
-                    [0,0,E_Y,0,B,0],
-                    [0,A,0,E_S,0,0],
-                    [0,0,B,0,E_F,0],
+                    [0,E_X,C,A,0,0],
+                    [0,-C,E_Y,0,B,0],
+                    [0,A,0,E_S,D,0],
+                    [0,0,B,-D,E_F,0],
                     [0,0,0,0,0,E_B]])
 
         eigenvalue, eigenvector = np.linalg.eig(H)
@@ -1374,6 +1494,18 @@ class fake_motor:
         print('Motor closed')
         pass
 
+class fake_motor_alt:
+    def __init__(self) -> None:
+        pass
+
+    def move_to(self,position):
+        print('Moving to position: ',position)
+        pass
+
+    def close(self):
+        print('Motor closed')
+        pass
+
 class fake_attenuator:
     def __init__(self) -> None:
         pass
@@ -1394,7 +1526,7 @@ class fake_power_meter:
         if pulse_object is not None:
             power = pulse_object.pulse_power
         else:
-            power = 1
+            power = 0
         print('got power:',power)
         return power
     

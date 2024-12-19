@@ -190,7 +190,9 @@ class simulator_control():
         self.pulse_y_plot.set_xdata(self.pulse_object.time)
         self.pulse_y_plot.set_ydata(np.real(self.pulse_object.temporal_representation_y))
         
-        # set y limits for pulses 
+        # update x and y limits for pulses
+        self.ax_pulses.set_xlim([np.min(self.pulse_object.time),np.max(self.pulse_object.time)])
+        
         self.ax_pulses.set_ylim([1.1*np.min([np.real(self.pulse_object.temporal_representation_x),np.real(self.pulse_object.temporal_representation_y)]),1.1*np.max([np.abs(self.pulse_object.temporal_representation_x),np.abs(self.pulse_object.temporal_representation_y)])])
         
         
@@ -274,8 +276,8 @@ class simulator_control():
         self.ax_pulses = fig_simulator.add_subplot()
         self.ax_simulation = self.ax_pulses.twinx()
         
-        self.pulse_x_plot, = self.ax_pulses.plot(self.pulse_object.time,np.abs(self.pulse_object.temporal_representation_x),'b',alpha=0.3)
-        self.pulse_y_plot, = self.ax_pulses.plot(self.pulse_object.time,np.abs(self.pulse_object.temporal_representation_y),'r',alpha=0.3)
+        self.pulse_x_plot, = self.ax_pulses.plot(self.pulse_object.time,np.real(self.pulse_object.temporal_representation_x),'b',alpha=0.3)
+        self.pulse_y_plot, = self.ax_pulses.plot(self.pulse_object.time,np.real(self.pulse_object.temporal_representation_y),'r',alpha=0.3)
         
         self.ax_pulses.set_xlabel('Time (ps)')
         
@@ -361,6 +363,10 @@ class simulator_control():
         self.change_folder_button = tk.Button(self.gui_window, text='Change Folder')
         self.change_folder_button.config(command= lambda: [self.change_folder_gui(),self.update_gui()])
         self.change_folder_button.grid(row=6,column=2)
+        
+        self.advanced_options_button = tk.Button(self.gui_window, text='Advanced Options')
+        self.advanced_options_button.config(command= lambda: [self.advanced_options_gui()])
+        self.advanced_options_button.grid(row=6,column=0)
         
         if self.running:
             self.update_gui()
@@ -544,6 +550,64 @@ class simulator_control():
         self.folder_entry.delete(0,tk.END)
         self.folder_entry.insert(0,self.save_folder)
         self.update_gui()
+        pass
+    
+    def advanced_options_gui(self):
+        
+        def update_advanced_options():
+            self.simulator_object.set_dipole_orientation(float(self.dipole_orientation_entry.get()))
+            if self.simulator_object.get_num_states() == 6:
+                self.simulator_object.set_mag_field(b_x = float(self.mag_field_x_entry.get()),b_z = float(self.mag_field_z_entry.get()))
+            
+            pass
+        
+        self.advanced_window = tk.Toplevel(self.gui_window)
+        self.advanced_window.title('Advanced Options')
+        
+        self.update_advanced_options_button = tk.Button(master=self.advanced_window, text = 'Update')
+        self.update_advanced_options_button.config(command= lambda: [update_advanced_options()])
+        self.update_advanced_options_button.grid(row=0,column=0)
+        
+        tk.Label(master=self.advanced_window, text = 'Dipole orientation (deg): ').grid(row=1,column=0)
+        
+        self.dipole_orientation_entry = tk.Entry(master=self.advanced_window, width = 20)
+        self.dipole_orientation_entry.insert(0,self.simulator_object.dipole_orientation)
+        self.dipole_orientation_entry.grid(row=1,column=1)
+        
+        tk.Label(master=self.advanced_window, text = 'Toggle phonons: ').grid(row=2,column=0)
+        
+        self.toggle_phonons_button = tk.Button(master=self.advanced_window, text = 'Toggle')
+        self.toggle_phonons_button.config(command= lambda: [self.simulator_object.toggle_phonons(),self.button_color(self.toggle_phonons_button,self.simulator_object.phonons)])
+        self.toggle_phonons_button.grid(row=2,column=1)
+        self.button_color(self.toggle_phonons_button,self.simulator_object.phonons)
+        
+        # enable when phonons are implemented
+        if not self.simulator_object.phonons:
+            self.toggle_phonons_button.config(state='disabled')
+        
+        num_general_settings = 3
+        if self.simulator_object.get_num_states() == 6:
+            tk.Label(self.advanced_window, text = '~~~~ Six Level Settings ~~~~').grid(row=num_general_settings,column=0)
+            tk.Label(master=self.advanced_window, text = 'Magnetic field Z (T): ').grid(row=num_general_settings+1,column=0)
+            
+            self.mag_field_z_entry = tk.Entry(master=self.advanced_window, width = 20)
+            self.mag_field_z_entry.insert(0,self.simulator_object.b_z)
+            self.mag_field_z_entry.grid(row=num_general_settings+1,column=1)
+            
+            tk.Label(master=self.advanced_window, text = 'Magnetic field X (T): ').grid(row=num_general_settings+2,column=0)
+            
+            self.mag_field_x_entry = tk.Entry(master=self.advanced_window, width = 20)
+            self.mag_field_x_entry.insert(0,self.simulator_object.b_x)
+            self.mag_field_x_entry.grid(row=num_general_settings+2,column=1)
+            
+            tk.Label(master=self.advanced_window, text = 'Transorm in mag. frame: ').grid(row=num_general_settings+3,column=0)
+            
+            self.toggle_mag_frame_button = tk.Button(master=self.advanced_window, text = 'Toggle')
+            self.toggle_mag_frame_button.config(command= lambda: [self.simulator_object.toggle_b_field_frame(),self.button_color(self.toggle_mag_frame_button,self.simulator_object.b_field_frame)])
+            self.toggle_mag_frame_button.grid(row=num_general_settings+3,column=1)
+            self.button_color(self.toggle_mag_frame_button,self.simulator_object.b_field_frame)
+        
+        
         pass
     
     def start_gui(self):

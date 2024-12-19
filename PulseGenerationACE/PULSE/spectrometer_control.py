@@ -49,6 +49,7 @@ class spectrometer_control:
         self.simulation_counts = simulation_counts
         self.running = False
         self.view = False
+        self.spec_during_meas = False
         self.pulse_scale = 1
         
         self.simulation_background = 0 
@@ -105,6 +106,10 @@ class spectrometer_control:
     
     def toggle_force_gui_update(self):
         self.force_gui_update = not self.force_gui_update
+        pass
+    
+    def toggle_spec_during_meas(self):
+        self.spec_during_meas = not self.spec_during_meas
         pass
     
     def change_view(self):
@@ -301,6 +306,8 @@ class spectrometer_control:
         
         self.measurment = measurement
         print('Measurement: '+str(measurement))
+        if self.spec_during_meas:
+            self.save_spectrum()
         return self.measurment
     
     def get_measurement_result(self):
@@ -334,6 +341,10 @@ class spectrometer_control:
         if len(self.measurement_arguments) == 4:
             control.measurement_args_spec[-1].insert(0,self.measurement_arguments[3])
         
+        control.spec_meas_button = tk.Button(control.gui_window, text='Record Spectrum')
+        control.spec_meas_button.config(command= lambda: [self.toggle_spec_during_meas(),self.button_color(control.spec_meas_button,self.spec_during_meas)])
+        control.spec_meas_button.grid(row=row_offset+2,column=2+column_offset)
+        
         return num_rows
     
     def multi_line_measurement(self,arguments = []):
@@ -346,6 +357,8 @@ class spectrometer_control:
             output_list.append(self.single_line_measurement([center_wl,width_wl,method,target]))
         
         self.measurment = output_list
+        if self.spec_during_meas:
+            self.save_spectrum()
         return self.measurment
     
     def multi_line_measurement_gui(self, control = None, row_offset = 0, column_offset = 0):
@@ -380,7 +393,10 @@ class spectrometer_control:
             control.measurement_args_spec.append(tk.Entry(control.gui_window))
             control.measurement_args_spec[-1].grid(row=row_offset+5,column=1+column_offset+i)
             control.measurement_args_spec[-1].insert(0,str(self.measurement_arguments[4+i*4]))
-            
+        
+        control.spec_meas_button = tk.Button(control.gui_window, text='Record Spectrum')
+        control.spec_meas_button.config(command= lambda: [self.toggle_spec_during_meas(),self.button_color(control.spec_meas_button,self.spec_during_meas)])
+        control.spec_meas_button.grid(row=row_offset+2,column=2+column_offset+i)
         return num_rows 
         
     
@@ -818,7 +834,7 @@ class spectrometer_control:
         self.simulation_mode_combined_button.grid(row=8, column=1)
         self.button_color(self.simulation_mode_combined_button,self.simulation_mode_combined)
         
-        tk.Label(self.settings_window, text='LP angle: ').grid(row=9,column=0)
+        tk.Label(self.settings_window, text='LP angle (deg): ').grid(row=9,column=0)
         
         self.lp_angle_entry = tk.Entry(self.settings_window, width=10)
         if self.spectrometer_object.polarisation_angle is None:
