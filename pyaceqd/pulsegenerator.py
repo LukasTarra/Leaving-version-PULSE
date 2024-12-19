@@ -1276,7 +1276,7 @@ class PulseGenerator:
     
     def copy_pulse(self):
         return copy.deepcopy(self)
-
+    
 # loading a pulse from a file
 def load_pulse(file_name):
     if file_name[-6:] != '.pulse':

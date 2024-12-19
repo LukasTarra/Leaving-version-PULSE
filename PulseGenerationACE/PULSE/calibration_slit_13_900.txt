@@ -1,7 +1,7 @@
 [pulse_shaper]
 poly_0 = 895
 poly_1 = 1
-slit_width = 0.3
+slit_width = 0.2
 psf_width = 0.1
 slit_pos_min = 0
 slit_pos_max = 10

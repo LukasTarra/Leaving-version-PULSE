@@ -4,7 +4,7 @@ biexciton_wavelength = 898.1
 dark_wavelength = 896.6
 
 [SPLITTING]
-fss_bright = 20
+fss_bright = 0
 fss_dark = 11.14
 
 [LIFETIMES]

@@ -445,7 +445,7 @@ class Pulse_Generator():
             self.add_pulse_kind_button.config(command = lambda: [self.add_gaussian_time([float(args_list_entry[0].get()), float(args_list_entry[1].get()), float(args_list_entry[2].get())], 
                                                                   [float(self.pol_entry_x.get()), float(self.pol_entry_y.get())],
                                                                   [float(self.phase_entry_wl.get()), float(self.phase_entry[0].get()), float(self.phase_entry[1].get()), float(self.phase_entry[2].get()), float(self.phase_entry[3].get())],
-                                                                  float(self.power_entry.get()),index = index), self.update_gui(), self.pulse_window.destroy()])
+                                                                  float(self.power_entry.get()),index = index), self.update_gui()])
             
         elif pulse_kind == 'gaussian_frequency':
             self.pulse_window.title('Add Gaussian Frequency')
@@ -476,7 +476,7 @@ class Pulse_Generator():
             self.add_pulse_kind_button.config(command = lambda: [self.add_gaussian_frequency([float(args_list_entry[0].get()), float(args_list_entry[1].get()), float(args_list_entry[2].get())], 
                                                                   [float(self.pol_entry_x.get()), float(self.pol_entry_y.get())],
                                                                   [float(self.phase_entry_wl.get()), float(self.phase_entry[0].get()), float(self.phase_entry[1].get()), float(self.phase_entry[2].get()), float(self.phase_entry[3].get())],
-                                                                  float(self.power_entry.get()),index = index), self.update_gui(), self.pulse_window.destroy()])
+                                                                  float(self.power_entry.get()),index = index), self.update_gui()])
             
         elif pulse_kind == 'initial_pulse':
             self.pulse_window.title('Modify initial pulse')
@@ -493,7 +493,7 @@ class Pulse_Generator():
             
             
             
-            self.add_pulse_kind_button.config(command= lambda: [self.pulse_list[index].shift_in_frequency(unit = 'nm', shift = float(self.frequency_shift_entry.get())),self.pulse_list[index].shift_in_time(float(self.time_shift_entry.get())),self.add_pulse_power(float(self.power_entry.get()),index),self.pulse_list[index].set_pulse_power(float(self.power_entry.get())),self.add_phase(self.pulse_list[index], float(self.phase_entry_wl.get()), [float(self.phase_entry[0].get()), float(self.phase_entry[1].get()), float(self.phase_entry[2].get()), float(self.phase_entry[3].get())]), self.update_gui(), self.add_initial_pulse(index=index),self.pulse_window.destroy()])
+            self.add_pulse_kind_button.config(command= lambda: [self.pulse_list[index].shift_in_frequency(unit = 'nm', shift = float(self.frequency_shift_entry.get())),self.pulse_list[index].shift_in_time(float(self.time_shift_entry.get())),self.add_pulse_power(float(self.power_entry.get()),index),self.pulse_list[index].set_pulse_power(float(self.power_entry.get())),self.add_phase(self.pulse_list[index], float(self.phase_entry_wl.get()), [float(self.phase_entry[0].get()), float(self.phase_entry[1].get()), float(self.phase_entry[2].get()), float(self.phase_entry[3].get())]), self.update_gui(), self.add_initial_pulse(index=index)])
             
             # 
             

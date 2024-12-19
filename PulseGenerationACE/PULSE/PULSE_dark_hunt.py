@@ -3,9 +3,10 @@ from matplotlib import pyplot as plt
 from scipy.io import savemat
 import pyaceqd.pulsegenerator as pg 
 import os as os
-from Pulse_v2 import fake_spectrometer, fake_motor, pulse_shaper_obj, simulator, attenuator, half_wave_plate, fake_attenuator, motor, spectrometer, load_pulse_device, create_experiment, save_pulse, save_temp, save_device, excecute_folder, power_meter, time_delay 
+from Pulse_v2 import fake_spectrometer, fake_motor, pulse_shaper_obj, simulator, attenuator, half_wave_plate, fake_attenuator, motor, spectrometer, load_pulse_device, create_experiment, save_pulse, save_temp, save_device, excecute_folder, power_meter, time_delay, fake_power_meter
 
 import control_optimizer as con_opt
+import hyper_dimensional_scan as hds
 
 from PULSE_gui_tools import gui_manager
 
@@ -39,8 +40,8 @@ lab_motor3 = motor(fake_motor(),name='motor3')
 lab_att2 = fake_attenuator()
 
 t_0 = 0 
-t_end = 200
-dt = 0.02
+t_end = 250
+dt = 0.2
 
 
 ###### set 1 +45 ps^2
@@ -117,16 +118,16 @@ delay_controller.set_control_value(delay_F)
 
 
 simulator_object = simulator(qd_calibration=qd_calibration, sim_kind='ace_6ls', temp_dir='sim_dump/')
-simulator_object.set_ace_six_level(b_x=3, b_field_frame=True)
+simulator_object.set_ace_six_level(b_x=3,b_z = 0, b_field_frame=True)
 sim_controller = simulator_object.open_control(previous_control = [att_controller,delay_controller],open_gui=False) #,delay_controller
 sim_controller.set_dipole_moment(dipole)
 sim_controller.gui()
 
 spec = spectrometer(device=lab_spectromter, name='MF_spec') 
 sm_controller = spec.open_control(pulse_object=None,previous_control = [att_controller,delay_controller], simulation_control= sim_controller,open_gui=False) #, ps_controller3#ps_controller2.get_pulse_object()
-sm_controller.set_simulation_background(45)
+sm_controller.set_simulation_background(0)
 sm_controller.set_simulation_gaussian_noise(0)#4.35
-sm_controller.set_pulse_scale(0.01)
+
 sm_controller.set_simulation_counts(500)
 #sm_controller.toggle_running()
 sm_controller.change_view()
@@ -137,14 +138,19 @@ sm_controller.gui()
 
 #sm_controller.update_gui()
 
-
+power_meter_M2 = power_meter(fake_power_meter(),name='power_meter_A')
+power_meter_M2_control = power_meter_M2.open_control(previous_control=[att_controller,delay_controller],open_gui=False)
 
 
 co = con_opt.control_optimizer(device_control=[ps_controller,att_controller, ps_controller2,att_controller2,delay_controller],measururement_control=sm_controller,measurement_kind='spectrometer',open_gui=False) # ,delay_controller , ps_controller,att_controller
 co.set_scan_limits([(778.8,779.2),(0.01,1), (777.8,778.2),(0.01,1), (0,20)]) #,(-10,10) ,(778.8,779.2),(0.01,1)
-co.set_spectrometer_measurement(779.95,0.01,method='max')
+sm_controller.set_measurement_method('single line')
+sm_controller.set_measurement_arguments(arguments=[779.95, 0.01, 'max'])
+#co.set_spectrometer_measurement(779.95,0.01,method='max')
 co.gui()
 
-gui_m = gui_manager(device_control=[ps_controller,att_controller, ps_controller2,att_controller2,delay_controller, sm_controller, sim_controller, co],num_coloums=2)
+scan = hds.hyper_scan(device_control=[ps_controller,att_controller, ps_controller2,att_controller2,delay_controller],measururement_control=[sm_controller, power_meter_M2_control],open_gui=True) #, ps_controller,att_controller
+
+gui_m = gui_manager(device_control=[ps_controller,att_controller, ps_controller2,att_controller2,delay_controller, sm_controller, sim_controller, co, scan],num_coloums=2)
 #co.run_optimization()
 sm_controller.start_gui()

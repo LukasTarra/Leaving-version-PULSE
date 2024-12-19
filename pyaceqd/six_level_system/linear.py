@@ -44,8 +44,10 @@ def sixls_linear(t_start, t_end, *pulses, dt=0.5, delta_b=4, gamma_e=1/100, gamm
         system_op.append("{}*(|2><4|_6 + |4><2|_6 )".format(-0.5*mu_b*bx*(g_ex-g_hx)))
     # bright-bright and dark-dark coupling depending on Bz
     if bz != 0.0:
-        system_op.append("-i*{}*(|2><1|_6 - |1><2|_6 )".format(-0.5*mu_b*bz*(g_ez-3*g_hz)))
-        system_op.append("-i*{}*(|4><3|_6 - |3><4|_6 )".format(+0.5*mu_b*bz*(g_ez+3*g_hz)))
+        # system_op.append("-i*{}*(|2><1|_6 - |1><2|_6 )".format(-0.5*mu_b*bz*(g_ez-3*g_hz)))
+        # system_op.append("-i*{}*(|4><3|_6 - |3><4|_6 )".format(+0.5*mu_b*bz*(g_ez+3*g_hz)))
+        system_op.append("i*{}*(|1><2|_6 -|2><1|_6)".format(0.5*mu_b*bz*(g_ez-3*g_hz)))
+        system_op.append("i*{}*(|4><3|_6 - |3><4|_6 )".format(-0.5*mu_b*bz*(g_ez+3*g_hz)))
     boson_op = "1*(|1><1|_6+|2><2|_6+|3><3|_6+|4><4|_6) + 2*|5><5|_6"
     lindblad_ops = []
     if lindblad:
