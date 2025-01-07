@@ -32,7 +32,7 @@ from matplotlib.backend_bases import key_press_handler
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg,
                                                NavigationToolbar2Tk)
 from matplotlib.figure import Figure 
-
+import sys
 
 # ----- Collaps of the GUI -----
 
@@ -64,8 +64,11 @@ class gui_manager():
         def close_windows():
             for i in self.device_control:
                 # only destroy if the window is not already destroyed
+                if hasattr(i,'close'):
+                    i.close()
                 i.gui_window.destroy
             self.gui_window.destroy()
+            sys.exit()
             
         self.gui_window.protocol("WM_DELETE_WINDOW", close_windows)
         

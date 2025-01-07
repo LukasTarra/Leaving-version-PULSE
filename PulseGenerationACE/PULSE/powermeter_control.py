@@ -221,6 +221,7 @@ class powermeter_control:
                 button_object.config(bg='white')
     
     def gui(self):
+        self.update_measurement()
         self.open_gui = True
         
         if self.previous_control is None:

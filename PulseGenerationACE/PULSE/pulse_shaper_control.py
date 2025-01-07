@@ -288,6 +288,7 @@ class pulse_shaper_control():
         
         self.calibration_file_window = tk.Toplevel(self.gui_window)
         self.calibration_file_window.title('Edit calibration file: '+ self.name)
+        #self.calibration_file_window.protocol("WM_DELETE_WINDOW", self.calibration_file_window.withdraw)
         
         tk.Label(self.calibration_file_window, text='File name: ').grid(row=0,column=0)
         

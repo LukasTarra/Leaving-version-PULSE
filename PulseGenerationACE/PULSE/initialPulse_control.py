@@ -356,7 +356,7 @@ class Pulse_Generator():
     
     def pulse_gui(self,pulse_kind, args = None, pol = None, phase_args = None, power = None, index = None):
         self.pulse_window = tk.Toplevel(self.gui_window)
-        
+        #self.pulse_window.protocol("WM_DELETE_WINDOW", self.pulse_window.withdraw)
         
         #general settings
         self.label4 = tk.Label(self.pulse_window, text='Polarisation [h,v]: ')

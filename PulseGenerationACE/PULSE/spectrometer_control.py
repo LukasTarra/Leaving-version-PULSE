@@ -627,8 +627,8 @@ class spectrometer_control:
         
         
         self.ax_experiment.set_xlabel('Wavelength [nm]')
-        self.x_lim_min = self.spectrometer_object.exp_wl_0[0]
-        self.x_lim_max = self.spectrometer_object.exp_wl_0[-1]
+        self.x_lim_min = np.min(self.spectrometer_object.exp_wl_0)
+        self.x_lim_max = np.max(self.spectrometer_object.exp_wl_0)
         self.ax_experiment.set_xlim(self.x_lim_min,self.x_lim_max)
         
         self.y_lim_min_exp = 0
@@ -775,6 +775,8 @@ class spectrometer_control:
     def settings_gui(self):
         self.settings_window = tk.Toplevel(self.gui_window)
         self.settings_window.title('Spectrometer settings')
+        #self.settings_window.protocol("WM_DELETE_WINDOW", self.settings_window.withdraw)
+        
         self.set_settings_button = tk.Button(self.settings_window, text='Set Settings')
         self.set_settings_button.config(command= lambda: [self.set_settings(float(self.min_wavelength_entry.get()),float(self.max_wavelength_entry.get()),float(self.simulation_background_entry.get()),float(self.simulation_gaussian_noise_entry.get()),self.poissonian_noise, float(self.simulation_counts_entry.get()), float(self.pulse_scale_entry.get()) ,float(self.min_exp_entry.get()), float(self.max_exp_entry.get()), float(self.min_sim_entry.get()), float(self.max_sim_entry.get()), self.lp_angle_entry.get())])
         self.set_settings_button.grid(row=0,column=0)
