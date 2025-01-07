@@ -788,6 +788,9 @@ class generic_wave_plate():
     def set_phase(self,phase):
         self.phase = phase
         
+    def close(self):
+        pass
+        
 class linear_polarizer():
     def __init__(self,name = 'LP', angle = 0, unit = 'deg') -> None:
         self.name = name
