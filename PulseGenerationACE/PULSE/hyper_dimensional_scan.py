@@ -220,6 +220,10 @@ class hyper_scan():
         counter = 0
         save_counter = 0
         
+        measurement_gui_states = []
+        for measurement in self.measururement_control:
+            measurement_gui_states.append(measurement.force_gui_update)
+            measurement.force_gui_update = False
         # check if directory for hyper scans exists
         if not os.path.exists(self.hyper_scan_folder):
             os.makedirs(self.hyper_scan_folder)
@@ -237,7 +241,7 @@ class hyper_scan():
                 elif self.total_scan[i][0] == 1:
                     measurement_args = self.total_scan[i][1].get_measurement_args(self)
                     self.total_scan[i][1].measurement_method(arguments = measurement_args)
-                    
+                    self.total_scan[i][1].update_gui()
                 elif self.total_scan[i][0] == 2:
                     device_state = self.get_device_state()
                     file.write(str(save_counter)+'\t')
@@ -267,8 +271,13 @@ class hyper_scan():
         
         # save and close .txt file
             file.close()
-            
-            
+        
+        for i, measurement in enumerate(self.measururement_control):
+            measurement.force_gui_update = measurement_gui_states[i]    
+        
+        for measurement in self.measururement_control:
+            measurement.update_gui()
+        
         pass
                 
     
