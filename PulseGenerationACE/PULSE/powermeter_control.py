@@ -46,6 +46,8 @@ class powermeter_control:
         self.display_experiment = False
         self.display_pulse = False
         
+        self.force_gui_update = True
+        
         if pulse_object is not None:
             if type(pulse_object) is str:
                  pulse_object = pg.load_pulse(pulse_object)
@@ -331,7 +333,8 @@ class powermeter_control:
         #self.ax_experiment.set_xlim([0, max(self.time_vector_seconds)])
         if  any([self.running_experiment, self.running_pulse]):
             self.gui_window.update_idletasks()
-            self.gui_window.after(self.refresh_rate,self.update_gui)
+            if self.force_gui_update:
+                self.gui_window.after(self.refresh_rate,self.update_gui)
             
     
     def start_gui(self):

@@ -151,7 +151,7 @@ class control_optimizer():
         for device in self.measururement_control:
             if device.open_gui:
                 device.gui_window.update_idletasks()
-                #device.update_gui()
+                device.update_gui()
             
             #device.update_measurement()
             
@@ -163,9 +163,13 @@ class control_optimizer():
         
     def run_optimization(self):
         self.run_counter = 0
+        measurement_gui_state = self.measururement_control[0].force_gui_update
+        self.measururement_control[0].force_gui_update = False
         self.optimized_control_values = gp_minimize(self.optimize_function, n_calls = self.num_calls, n_random_starts = self.num_random_starts, dimensions=self.scan_limits, x0=self.get_control_value(),y0=self.optimize_function(self.get_control_value()),initial_point_generator='halton')
         
         self.optimize_function(self.optimized_control_values.x)
+        self.measururement_control[0].force_gui_update = measurement_gui_state
+        self.measururement_control[0].update_gui()
         pass
     
     def optimize_function(self, optimize_values:list): 
