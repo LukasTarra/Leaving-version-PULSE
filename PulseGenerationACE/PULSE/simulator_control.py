@@ -391,7 +391,7 @@ class simulator_control():
         
         self.qd_window = tk.Toplevel(self.gui_window)
         self.qd_window.title('Quantum Dot Calibration')
-        self.qd_window.protocol("WM_DELETE_WINDOW", self.live_plot_settings_window.withdraw)
+        #self.qd_window.protocol("WM_DELETE_WINDOW", self.live_plot_settings_window.withdraw)
         
         tk.Label(master=self.qd_window, text= 'File name: ').grid(row=0,column=0)
         self.qd_calibration_entry = tk.Entry(master=self.qd_window, width = 20)

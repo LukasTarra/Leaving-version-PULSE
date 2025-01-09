@@ -36,6 +36,8 @@ from matplotlib.figure import Figure
 from scipy.optimize import minimize
 from skopt import gp_minimize
 
+import pandas as pd
+
 
 class hyper_scan():
     def __init__(self, device_control: list = [], measururement_control: list = [], open_gui = True, name = 'Hyper_scan') -> None: 
@@ -131,7 +133,7 @@ class hyper_scan():
         
         self.save_header = 'Hyper scan: '+now_str+'\nNumber of devices: '+str(len(self.device_control_initial))+ '\nNumber of active devices: '+str(len(self.device_control)) + '\nNumber of measurement devices: '+str(len(self.measururement_control)) + '\nTotal moves: '+str(self.total_scan_num)+ '\nActive devices: '+str(self.device_string) + '\nActive measurements: '+str(self.measurement_string) + '\n'
         
-        device_name_str = 'Number \t'
+        device_name_str = 'Number\t'
         for i in range(len(self.device_control_initial)):
             device_name_str += self.device_control_initial[i].name + '\t'
             
@@ -225,7 +227,9 @@ class hyper_scan():
         # open.txt file and write header
         with open(self.hyper_scan_folder+'/'+self.save_name, 'w') as file:
             file.write(self.save_header)
-        
+
+            # record run time 
+            start_time = time.time()
             for i in range(len(self.total_scan)):
                 if self.total_scan[i][0] == 0:
                     self.total_scan[i][1].set_control_value(self.total_scan[i][2])
@@ -241,6 +245,19 @@ class hyper_scan():
                         file.write(str(device)+'\t')
                     file.write('\n')
                     save_counter += 1
+                    
+                    
+                if self.live_plot.get():
+                    time_since_lp = time.time()-start_time
+                    if time_since_lp >= self.live_plot_update_rate or i == len(self.total_scan)-1:
+                        # set to read mode 
+                        file.close()
+                        #file = open(self.hyper_scan_folder+'/'+self.save_name, 'r')
+                        self.update_live_plotting()
+                        #file.close()
+                        file = open(self.hyper_scan_folder+'/'+self.save_name, 'a')
+                        start_time = time.time()    
+                
                 
                 self.update_device_control()
                 self.update_measurement_control()
@@ -321,6 +338,17 @@ class hyper_scan():
         self.save_name_entry.config(state=tk.NORMAL)
         self.save_name_entry.delete(0, tk.END)
         self.save_name_entry.insert(0, self.save_name)
+        #up to 3 dimensional scans can be live plotted 
+        if len(self.device_control) <= 3:
+            self.live_plot_checkbox.config(state=tk.DISABLED)
+            self.live_plot_settings.config(state=tk.NORMAL)
+        else:
+            self.live_plot_checkbox.config(state=tk.DISABLED)
+            self.live_plot.set(False)
+            self.live_plot_settings.config(state=tk.DISABLED)
+        
+        
+        #self.live_plot_settings.config(state=tk.NORMAL)
         
     def reset_scan_gui(self):
         self.reset_scan()
@@ -331,6 +359,11 @@ class hyper_scan():
         self.save_name_entry.config(state=tk.DISABLED)
         self.save_name_entry.delete(0, tk.END)
         self.save_name_entry.insert(0, self.save_name)
+        #
+        self.live_plot_checkbox.config(state=tk.DISABLED)
+        self.live_plot_settings.config(state=tk.DISABLED)
+        self.lp_data = []
+        self.lp_windows = []
         
     def gui(self):
         self.open_gui = True
@@ -421,6 +454,13 @@ class hyper_scan():
         tk.Label(self.gui_window, text='~~~~~~~Measurement Control~~~~~~~~').grid(row=device_row_offset+len(self.device_control_initial)+2, column=0, columnspan=1)
         
         
+        self.live_plot = tk.BooleanVar(value=False)
+        self.live_plot_checkbox = tk.Checkbutton(self.gui_window, text='Live Plot', variable = self.live_plot, state=tk.DISABLED)
+        self.live_plot_checkbox.grid(row=device_row_offset+len(self.device_control_initial)+2, column=3)
+        
+        self.live_plot_settings = tk.Button(self.gui_window, text='Live Plot Settings', command = self.live_plot_settings_gui, state=tk.DISABLED)
+        self.live_plot_settings.grid(row=device_row_offset+len(self.device_control_initial)+2, column=4)
+        
         measurment_row_offset = device_row_offset + len(self.device_control_initial)+2
         
         measurment_row = 0
@@ -442,6 +482,216 @@ class hyper_scan():
         
         self.measurement_string_label = tk.Label(self.gui_window, text = self.measurement_string)
         self.measurement_string_label.grid(row=measurment_row_offset+measurment_row+2, column=2)
+        
+    def live_plot_settings_gui(self):
+        self.lp_dimensions = np.min([len(self.device_control),3])
+        self.lp_windows = []
+        self.lp_data = []
+        self.live_plot_update_rate = 3
+        
+        #self.live_plot_settings.config(state=tk.DISABLED)
+        self.live_plot_settings_window = tk.Toplevel(self.gui_window)
+        self.live_plot_settings_window.title('Live Plot Settings')
+        #self.live_plot_settings_window.protocol("WM_DELETE_WINDOW", lambda: [self.live_plot_settings_window.withdraw])
+        
+        self.live_plot_values = []
+        
+        for i in range(len(self.device_control)):
+            self.live_plot_values.append(self.device_control[i].name)
+        
+        for i in range(len(self.measururement_control)):
+            for j in range(self.measururement_control[i].get_number_measurement_outputs()):
+                self.live_plot_values.append(self.measururement_control[i].name+'_'+str(j))
+        self.live_plot_values.append('Number')
+        #self.live_plot_values.append('--None--')
+        
+        self.live_plot_axis_menu = []
+        for i in range(self.lp_dimensions):
+            tk.Label(self.live_plot_settings_window, text='--Axis '+str(i+1)+'--').grid(row=0, column=i)
+            self.live_plot_axis_menu.append(ttk.Combobox(self.live_plot_settings_window, values = self.live_plot_values, state='readonly'))
+            self.live_plot_axis_menu[i].grid(row=1, column=i)
+            
+            self.live_plot_axis_menu[i].current(i)
+
+        tk.Label(self.live_plot_settings_window, text ='--Data--').grid(row=0, column=i+1)
+        self.live_plot_data_menu = ttk.Combobox(self.live_plot_settings_window, values = self.live_plot_values, state='readonly')
+        self.live_plot_data_menu.grid(row=1, column=i+1)
+        self.live_plot_data_menu.current(len(self.device_control))
+        
+        tk.Label(self.live_plot_settings_window, text = 'Update rate (s):').grid(row=2, column=0)
+        self.live_plot_update_rate_entry = tk.Entry(self.live_plot_settings_window)
+        self.live_plot_update_rate_entry.grid(row=2, column=1)
+        self.live_plot_update_rate_entry.insert(0, str(self.live_plot_update_rate))
+        
+        self.live_plot_add_plot_button = tk.Button(self.live_plot_settings_window, text='Add Plot', command = self.add_live_plot)
+        self.live_plot_add_plot_button.grid(row=2, column=2)
+        
+        pass
+    
+    def add_live_plot(self):
+        self.lp_windows.append(tk.Toplevel(self.gui_window))
+        lp_current = self.lp_windows[-1]
+        lp_current.title('Live Plot')
+        
+        def close_windows():
+            lp_current.destroy()
+            self.lp_windows.remove(lp_current)
+            self.lp_data.remove(self.lp_data[-1])
+            if len(self.lp_windows) == 0:
+                self.live_plot.set(False)
+                self.live_plot_checkbox.config(state=tk.DISABLED)
+        
+        lp_current.protocol("WM_DELETE_WINDOW", close_windows)
+        
+        lp_current.fig = Figure(figsize=(5, 4), dpi=100)
+        lp_current.ax = lp_current.fig.add_subplot()
+        
+        lp_current.axis = []
+        for i in range(self.lp_dimensions):
+            lp_current.axis.append(self.live_plot_axis_menu[i].get()) # .current()
+        lp_current.axis.append(self.live_plot_data_menu.get()) # .current()
+        
+        for i in range(self.lp_dimensions+1):
+            self.lp_data.append(list(-1*np.ones(self.lp_dimensions+1)))
+            
+        lp_current.ax.set_xlabel(self.live_plot_axis_menu[0].get())
+        
+        print(self.lp_dimensions)
+        print(self.lp_data)
+        
+        #print(self.lp_data[0])
+        #print(self.lp_data[1])
+        if self.lp_dimensions == 1:
+            lp_current.ax.set_ylabel(self.live_plot_data_menu.get())
+            lp_current.lp_plot_handle, = lp_current.ax.plot(self.lp_data[-1][0],self.lp_data[-1][1],'ko')
+            lp_current.ax.set_xlim([0,1])
+            lp_current.ax.set_ylim([0,1])
+        elif self.lp_dimensions == 2:
+            lp_current.ax.set_ylabel(self.live_plot_axis_menu[1].get())
+            lp_current.lp_plot_handle = lp_current.ax.scatter(self.lp_data[-1][0],self.lp_data[-1][1],c=self.lp_data[-1][2],cmap='viridis')
+            # colorbar
+            lp_current.cbar = lp_current.fig.colorbar(lp_current.lp_plot_handle)
+            lp_current.ax.set_xlim([0,1])
+            lp_current.ax.set_ylim([0,1])
+        elif self.lp_dimensions == 3:
+            
+            lp_current.lp_plot_handle = lp_current.ax.scatter(self.lp_data[-1][0],self.lp_data[-1][1],self.lp_data[-1][2],c=self.lp_data[-1][3],cmap='viridis')
+            lp_current.ax.set_ylabel(self.live_plot_axis_menu[1].get())
+            lp_current.ax.set_ylabel(self.live_plot_axis_menu[1].get())
+            lp_current.ax.set_zlabel(self.live_plot_axis_menu[2].get())
+            lp_current.ax.set_xlim([0,1])
+            lp_current.ax.set_ylim([0,1])
+            lp_current.ax.set_zlim([0,1])
+            # colorbar
+            lp_current.cbar = lp_current.fig.colorbar(lp_current.lp_plot_handle)
+            
+        
+        lp_current.canvas = FigureCanvasTkAgg(lp_current.fig, master=lp_current)  # A tk.DrawingArea.
+        lp_current.canvas.draw()
+        lp_current.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+        
+        self.live_plot.set(True)
+        self.live_plot_checkbox.config(state=tk.NORMAL)
+        
+        pass
+    def initialise_live_plotting(self):
+        self.lp_dimensions = np.min([len(self.device_control),3])
+        self.lp_data = []
+        self.live_plot_update_rate = 3
+    
+    def update_live_plotting(self):
+        self.live_plot_update_rate = float(self.live_plot_update_rate_entry.get())
+        # access date from the saved .txt file
+        #print('updating live plotting')
+        #with open(self.hyper_scan_folder+'/'+self.save_name, 'r') as file:
+        
+        ######
+        # lines = file.readlines()
+        # header_found = False
+        # #self.lp_data = []
+        # for line in lines:
+        #     if line[0] == '0':
+        #         header_found = True
+            
+        #     if header_found:
+        #         data = line.split('\t')
+        #         print(data)
+                
+        #         for lp_current in self.lp_windows:
+        #             for i in range(self.lp_dimensions+1):
+        #                 print(lp_current.axis[i])
+        #                 self.lp_data[i].append(float(data[lp_current.axis[i]]))
+        # print(self.lp_data)
+        # if self.lp_dimensions == 1:
+        #     lp_current.lp_plot_handle.set_xdata(self.lp_data[0])
+        #     lp_current.lp_plot_handle.set_ydata(self.lp_data[1])
+        self.lp_data = []
+        for j, lp_current in enumerate(self.lp_windows):
+            #print(lp_current.axis)
+            header_number = 9 + len(self.device_control) + len(self.measururement_control)
+            #print(header_number)
+            data_file = pd.read_csv(self.hyper_scan_folder+'/'+self.save_name, delimiter = '\t',header=header_number, usecols=lp_current.axis,dtype=float)
+            
+            dat = []
+            for i in range(self.lp_dimensions+1):
+                dat.append(data_file[lp_current.axis[i]])
+            self.lp_data.append(dat)
+            
+            lp_current.ax.set_xlim([np.min(self.lp_data[j][0]),np.max(self.lp_data[j][0])])
+            lp_current.ax.set_ylim([np.min(self.lp_data[j][1]),np.max(self.lp_data[j][1])])
+            
+            if self.lp_dimensions == 1:
+                lp_current.lp_plot_handle.set_xdata(self.lp_data[j][0])
+                lp_current.lp_plot_handle.set_ydata(self.lp_data[j][1])
+            elif self.lp_dimensions == 2:
+                #print(self.lp_data[j][2])
+                lp_current.lp_plot_handle.set_offsets(np.c_[self.lp_data[j][0],self.lp_data[j][1]])
+                lp_current.lp_plot_handle.set_array(self.lp_data[j][2])
+                lp_current.lp_plot_handle.set_clim([np.min(self.lp_data[j][2]),np.max(self.lp_data[j][2])])
+                lp_current.cbar.update_normal(lp_current.lp_plot_handle)
+            elif self.lp_dimensions == 3:
+                lp_current.lp_plot_handle._offsets3d = (self.lp_data[j][0],self.lp_data[j][1],self.lp_data[j][2])
+                lp_current.lp_plot_handle.set_array(self.lp_data[j][3])
+                lp_current.lp_plot_handle.set_clim([np.min(self.lp_data[j][3]),np.max(self.lp_data[j][3])])
+                lp_current.cbar.update_normal(lp_current.lp_plot_handle)
+                
+                
+            
+            lp_current.canvas.draw()
+            lp_current.update()
+                # for i in range(len(self.lp_windows)):
+                #     lp_current = self.lp_windows[i]
+                #     for j in range(self.lp_dimensions+1):
+                #         self.lp_data[j] = data[j]
+                    
+                #     if self.lp_dimensions == 1:
+                #         lp_current.lp_plot_handle.set_xdata(self.lp_data[0])
+                #         lp_current.lp_plot_handle.set_ydata(self.lp_data[1])
+                #     elif self.lp_dimensions == 2:
+                #         lp_current.lp_plot_handle.set_xdata(self.lp_data[0])
+                #         lp_current.lp_plot_handle.set_ydata(self.lp_data[1])
+                #     elif self.lp_dimensions == 3:
+                #         lp_current.lp_plot_handle.set_xdata(self.lp_data[0])
+                #         lp_current.lp_plot_handle.set_ydata(self.lp_data[1])
+                #         lp_current.lp_plot_handle.set_3d_properties(self.lp_data[2])
+                    
+                #     lp_current.ax.set_xlim([np.min(self.lp_data[0]),np.max(self.lp_data[0])])
+                #     lp_current.ax.set_ylim([np.min(self.lp_data[1]),np.max(self.lp_data[1])])
+                #     lp_current.canvas.draw()
+                #     lp_current.canvas.flush_events()
+                #     lp_current.update()
+                #     lp_current.deiconify()
+                #     lp_current.focus_force()
+                    
+                
+           
+                
+                
+        
+       
+        
+        pass
+    
     def start_gui(self):
         self.gui_window.mainloop()
         

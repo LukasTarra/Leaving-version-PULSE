@@ -372,6 +372,7 @@ class spectrometer():
                         if self.polarisation_angle is None:
                             weight = 1
                         else:
+                            #print(sim_object[i].photon_polarisation[i_sim])
                             cur_pol = self.lp.rotate(pol_vector=sim_object[i].photon_polarisation[i_sim])
                             weight = np.abs(cur_pol[0])**2 + np.abs(cur_pol[1])**2
                         sim_counts[int(np.argmin(np.abs(exp_wl-sim_wl)))] += sim_object[i].photon_emission[i_sim]*weight
@@ -874,11 +875,12 @@ class simulator():
         self.hwp = generic_wave_plate(name = 'HWP', phase = np.pi, unit = 'deg')
         self.print_info()
         
+        self.decay_scale_x = 0
+        self.decay_scale_y = 0
         
         if any(self.sim_kind.lower() == x for x in ['ace','ace_ds','qutip']):
             self.num_states = 4 
             
-        
         if any(self.sim_kind.lower() == x for x in ['ace_6ls']):
             self.num_states = 6 
             self.set_ace_six_level()
@@ -887,7 +889,7 @@ class simulator():
         self.photon_emission = []
         self.photon_wavelength = []
         self.photon_polarisation = []
-        for i in range(self.num_states):
+        for i in range(self.num_states + self.num_states - 4): # stupid fix, but we need 8 transitions for 6 level system
             self.photon_emission.append(0)
             self.photon_wavelength.append(0)
             self.photon_polarisation.append([])
@@ -987,25 +989,27 @@ class simulator():
             # photon emission estimated from integral over time
             self.photon_emission[0] = np.trapz(x = np.real(self.sim_out[0]),y = np.abs(self.sim_out[2]))
             # normalize to exciton lifetime
-            self.photon_emission[0] /= pulse_object.lifetime_exciton
+            self.photon_emission[0] *= 1/pulse_object.lifetime_exciton*(1-self.decay_scale_x)
             # plus last value of dynamics + half of last biexcion value
-            self.photon_emission[0] += np.abs(self.sim_out[2][-1]) + np.abs(self.sim_out[4][-1])/2
+            self.photon_emission[0] += np.abs(self.sim_out[2][-1]) + np.abs(self.sim_out[4][-1])/2*(1-self.decay_scale_x)
 
             self.photon_emission[1] = np.trapz(x = np.real(self.sim_out[0]),y = np.abs(self.sim_out[3]))
-            self.photon_emission[1] /= pulse_object.lifetime_exciton
-            self.photon_emission[1] += np.abs(self.sim_out[3][-1]) + np.abs(self.sim_out[4][-1])/2
+            self.photon_emission[1] *= 1/pulse_object.lifetime_exciton*(1-self.decay_scale_y)
+            self.photon_emission[1] += np.abs(self.sim_out[3][-1]) + np.abs(self.sim_out[4][-1])/2*(1-self.decay_scale_y)
 
             # for biexciton emission same, but split in two 
             self.photon_emission[2] = np.trapz(x = np.real(self.sim_out[0]),y = np.abs(self.sim_out[4]))/2
-            self.photon_emission[2] /= pulse_object.lifetime_biexciton
-            self.photon_emission[2] += np.abs(self.sim_out[4][-1])/2
+            self.photon_emission[2] *= 1/pulse_object.lifetime_biexciton*(1-self.decay_scale_x)
+            self.photon_emission[2] += np.abs(self.sim_out[4][-1])/2*(1-self.decay_scale_x)
 
-            self.photon_emission[3] = self.photon_emission[2]
+            self.photon_emission[3] = np.trapz(x = np.real(self.sim_out[0]),y = np.abs(self.sim_out[4]))/2
+            self.photon_emission[3] *= 1/pulse_object.lifetime_biexciton*(1-self.decay_scale_y)
+            self.photon_emission[3] += np.abs(self.sim_out[4][-1])/2*(1-self.decay_scale_y)
         else:
-            self.photon_emission[0] = np.abs(self.sim_out[2][-1]) + np.abs(self.sim_out[4][-1])/2
-            self.photon_emission[1] = np.abs(self.sim_out[3][-1]) + np.abs(self.sim_out[4][-1])/2
-            self.photon_emission[2] = np.abs(self.sim_out[4][-1])/2
-            self.photon_emission[3] = np.abs(self.sim_out[4][-1])/2
+            self.photon_emission[0] = np.abs(self.sim_out[2][-1]) + np.abs(self.sim_out[4][-1])/2*(1-self.decay_scale_x)
+            self.photon_emission[1] = np.abs(self.sim_out[3][-1]) + np.abs(self.sim_out[4][-1])/2*(1-self.decay_scale_y)
+            self.photon_emission[2] = np.abs(self.sim_out[4][-1])/2*(1-self.decay_scale_x)
+            self.photon_emission[3] = np.abs(self.sim_out[4][-1])/2*(1-self.decay_scale_y)
             
         if self.num_states == 6:
             config = configparser.ConfigParser()
@@ -1016,12 +1020,37 @@ class simulator():
                                                   
             self.photon_wavelength[4] =  dark_wavelength + dark_splitting
             self.photon_wavelength[5] =  dark_wavelength - dark_splitting
+            self.photon_wavelength[6] = self.photon_wavelength[2] + self.photon_wavelength[0]-self.photon_wavelength[4]
+            self.photon_wavelength[7] = self.photon_wavelength[3] + self.photon_wavelength[1]-self.photon_wavelength[5]
             
-            self.photon_emission[4] = np.abs(self.sim_out[5][-1]) 
-            self.photon_emission[5] = np.abs(self.sim_out[6][-1])
+            # implement decay after lunch 
+            
+            if self.decay:
+                self.photon_emission[4] = np.trapz(x = np.real(self.sim_out[0]),y = np.abs(self.sim_out[5]))
+                self.photon_emission[4] *= 1/pulse_object.lifetime_exciton*(self.decay_scale_x)
+                self.photon_emission[4] += np.abs(self.sim_out[5][-1]) + np.abs(self.sim_out[4][-1])/2*self.decay_scale_x
+                
+                self.photon_emission[5] = np.trapz(x = np.real(self.sim_out[0]),y = np.abs(self.sim_out[6]))
+                self.photon_emission[5] *= 1/pulse_object.lifetime_exciton*(self.decay_scale_y)
+                self.photon_emission[5] += np.abs(self.sim_out[6][-1]) + np.abs(self.sim_out[4][-1])/2*self.decay_scale_y
+                
+                self.photon_emission[6] = np.trapz(x = np.real(self.sim_out[0]),y = np.abs(self.sim_out[4]))/2
+                self.photon_emission[6] *= 1/pulse_object.lifetime_biexciton*(self.decay_scale_x)
+                self.photon_emission[6] += np.abs(self.sim_out[4][-1])/2*self.decay_scale_x
+                
+                self.photon_emission[7] = np.trapz(x = np.real(self.sim_out[0]),y = np.abs(self.sim_out[4]))/2
+                self.photon_emission[7] *= 1/pulse_object.lifetime_biexciton*(self.decay_scale_y)
+                self.photon_emission[7] += np.abs(self.sim_out[4][-1])/2*self.decay_scale_y
+            else:
+                self.photon_emission[4] = np.abs(self.sim_out[5][-1])  + np.abs(self.sim_out[4][-1])/2*self.decay_scale_x
+                self.photon_emission[5] = np.abs(self.sim_out[6][-1]) + np.abs(self.sim_out[4][-1])/2*self.decay_scale_y
+                self.photon_emission[6] = np.abs(self.sim_out[4][-1])/2*self.decay_scale_x
+                self.photon_emission[7] = np.abs(self.sim_out[4][-1])/2*self.decay_scale_y
             
             self.photon_polarisation[4] = [1,0]
             self.photon_polarisation[5] = [0,1]
+            self.photon_polarisation[6] = [1,0]
+            self.photon_polarisation[7] = [0,1]
 
         if self.photon_pulse_bool:
             pass
@@ -1123,6 +1152,7 @@ class simulator():
                 return_vector.append(cur_return)
             
         else:
+            _ = self.bx_field_basis_transformation(rho,self.b_x,self.qd_calibration, bz=self.b_z)
             for i in [0,1,2,5,3,4]: #range(self.num_states)
                 cur_return = []
                 for j in range(len(ds_t)):
@@ -1143,6 +1173,9 @@ class simulator():
         A = -0.5*mu_b*bx*(g_ex+g_hx)
         B = -0.5*mu_b*bx*(g_ex-g_hx) 
         
+        #print('+ mixing'+str(A))
+        #print('- mixing'+str(B))
+        
         C = -1j*0.5*mu_b*bz*(g_ez-3*g_hz)
         D = 1j*0.5*mu_b*bz*(g_ez+3*g_hz) # -
         # system_op.append("i*{}*(|1><2|_6 -|2><1|_6)".format(0.5*mu_b*bz*(g_ez-3*g_hz)))
@@ -1156,6 +1189,18 @@ class simulator():
                     [0,0,B,-D,E_F,0],
                     [0,0,0,0,0,E_B]])
 
+        sub_H_x_p = np.array([[E_X,A],
+                              [A,E_S]])
+        sub_H_x_m = np.array([[E_Y,B],
+                              [B,E_F]])
+        
+        _, U_x_p = np.linalg.eig(sub_H_x_p)
+        _, U_x_m = np.linalg.eig(sub_H_x_m) 
+        
+        
+        self.decay_scale_x = min(abs(U_x_p[0]))**2
+        self.decay_scale_y = min(abs(U_x_m[0]))**2
+        
         eigenvalue, eigenvector = np.linalg.eig(H)
 
         #print(eigenvector)
