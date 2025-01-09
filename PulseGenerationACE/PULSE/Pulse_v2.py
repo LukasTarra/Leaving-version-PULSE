@@ -1144,15 +1144,16 @@ class simulator():
         
         return_vector = [np.real(ds_t)]
         if self.b_field_frame:
-            rho = self.bx_field_basis_transformation(rho,self.b_x,self.qd_calibration, bz=self.b_z)
-            for i in [2,1,3,5,0,4]: #range(self.num_states)
+            rho, index = self.bx_field_basis_transformation(rho,self.b_x,self.qd_calibration, bz=self.b_z)
+            new_index = [index[0],index[1],index[2],index[5],index[3],index[4]]
+            for i in new_index: #range(self.num_states)
                 cur_return = []
                 for j in range(len(ds_t)):
                     cur_return.append(np.abs(rho[j][i,i])) 
                 return_vector.append(cur_return)
             
         else:
-            _ = self.bx_field_basis_transformation(rho,self.b_x,self.qd_calibration, bz=self.b_z)
+            _,_ = self.bx_field_basis_transformation(rho,self.b_x,self.qd_calibration, bz=self.b_z)
             for i in [0,1,2,5,3,4]: #range(self.num_states)
                 cur_return = []
                 for j in range(len(ds_t)):
@@ -1202,8 +1203,9 @@ class simulator():
         self.decay_scale_y = min(abs(U_x_m[0]))**2
         
         eigenvalue, eigenvector = np.linalg.eig(H)
-
-        #print(eigenvector)
+        index = []
+        for vec in eigenvector:
+            index.append(np.argmax(np.abs(vec)))
         #print(eigenvector.transpose())
         dress_state_index = np.argsort(eigenvalue)
         #print([0,E_X,E_Y,E_S,E_F,E_B])
@@ -1232,7 +1234,7 @@ class simulator():
         # print(dress_state_index)
 
         # print(eigenvalue)
-        return np.array(new_rho) 
+        return np.array(new_rho), index 
     
     def ace_four_level_ds(self,pulse_object,sim_dt = None, decay = False, phonons = False,plot = False,dipole_moment = 1): 
         if type(pulse_object) is str:
