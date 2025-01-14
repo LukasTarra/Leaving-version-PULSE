@@ -906,7 +906,7 @@ class simulator():
     def set_phonons(self,phonons):
         self.phonons = phonons
     
-    def set_temperture(self,temperature):
+    def set_temperature(self,temperature):
         self.temperature = temperature    
     
     def toggle_phonons(self):
