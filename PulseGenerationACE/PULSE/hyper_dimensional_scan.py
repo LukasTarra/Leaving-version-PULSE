@@ -72,6 +72,7 @@ class hyper_scan():
         self.date_str_create = datetime.now().strftime("%Y_%m_%d_%H_%M")
         self.snapshot_folder = 'snapshots_'+self.date_str_create
         self.hyper_scan_folder = 'hyper_scans_'+self.date_str_create
+    
         if self.open_gui:
             self.gui()
         
@@ -93,6 +94,7 @@ class hyper_scan():
         self.measurement_string = 'Measurements: \n'
         self.action_multiplier = 1
         self.save_name = 'scan_name.txt'
+       
         
         
     def set_scan_limits(self, device_index = 0, scan_limits = [0,1]):
@@ -220,9 +222,9 @@ class hyper_scan():
         counter = 0
         save_counter = 0
         
-        measurement_gui_states = []
+        #measurement_gui_states = []
         for measurement in self.measururement_control:
-            measurement_gui_states.append(measurement.force_gui_update)
+            #measurement_gui_states.append(measurement.force_gui_update)
             measurement.force_gui_update = False
         # check if directory for hyper scans exists
         if not os.path.exists(self.hyper_scan_folder):
@@ -234,6 +236,8 @@ class hyper_scan():
 
             # record run time 
             start_time = time.time()
+            self.lp_flag = False
+            self.stop_scan_flag = False
             for i in range(len(self.total_scan)):
                 if self.total_scan[i][0] == 0:
                     self.total_scan[i][1].set_control_value(self.total_scan[i][2])
@@ -249,9 +253,10 @@ class hyper_scan():
                         file.write(str(device)+'\t')
                     file.write('\n')
                     save_counter += 1
+                    self.lp_flag = True
                     
                     
-                if self.live_plot.get():
+                if self.live_plot.get() and self.lp_flag:
                     time_since_lp = time.time()-start_time
                     if time_since_lp >= self.live_plot_update_rate or i == len(self.total_scan)-1:
                         # set to read mode 
@@ -263,23 +268,27 @@ class hyper_scan():
                         start_time = time.time()    
                 
                 
+                
                 self.update_device_control()
                 self.update_measurement_control()
                 if self.open_gui:
                     self.scan_progress_bar['value'] = counter/self.total_scan_num
                     self.gui_window.update_idletasks()
-        
+                if self.stop_scan_flag:
+                    break
         # save and close .txt file
             file.close()
         
         for i, measurement in enumerate(self.measururement_control):
-            measurement.force_gui_update = measurement_gui_states[i]    
+            measurement.force_gui_update = True #measurement_gui_states[i]    
         
         for measurement in self.measururement_control:
             measurement.update_gui()
         
         pass
                 
+    def stop_scan(self):
+        self.stop_scan_flag = True
     
     def update_device_control(self):
         for device in self.device_control:
@@ -318,6 +327,7 @@ class hyper_scan():
     def run_scan_gui(self):
         self.set_hyper_scan_folder(self.scan_folder_entry.get())
         self.save_name = self.save_name_entry.get()
+        self.stop_button.config(state=tk.NORMAL)
         self.run_scan()
     
     def add_device_gui(self,device_index = 0):
@@ -371,6 +381,7 @@ class hyper_scan():
         #
         self.live_plot_checkbox.config(state=tk.DISABLED)
         self.live_plot_settings.config(state=tk.DISABLED)
+        self.stop_button.config(state=tk.DISABLED)
         self.lp_data = []
         self.lp_windows = []
         
@@ -461,6 +472,9 @@ class hyper_scan():
         self.save_name_entry.config(state=tk.DISABLED)
         
         tk.Label(self.gui_window, text='~~~~~~~Measurement Control~~~~~~~~').grid(row=device_row_offset+len(self.device_control_initial)+2, column=0, columnspan=1)
+        
+        self.stop_button = tk.Button(self.gui_window, text='Stop', command = self.stop_scan,state=tk.DISABLED)
+        self.stop_button.grid(row=device_row_offset+len(self.device_control_initial)+2, column=1)
         
         
         self.live_plot = tk.BooleanVar(value=False)

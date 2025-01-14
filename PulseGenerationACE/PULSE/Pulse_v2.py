@@ -878,12 +878,17 @@ class simulator():
         self.decay_scale_x = 0
         self.decay_scale_y = 0
         
+        self.set_ace_six_level()
+        self.refresh_num_states()
+        
+    
+    def refresh_num_states(self):
         if any(self.sim_kind.lower() == x for x in ['ace','ace_ds','qutip']):
             self.num_states = 4 
             
         if any(self.sim_kind.lower() == x for x in ['ace_6ls']):
             self.num_states = 6 
-            self.set_ace_six_level()
+            
             
         
         self.photon_emission = []
@@ -900,7 +905,10 @@ class simulator():
     
     def set_phonons(self,phonons):
         self.phonons = phonons
-        
+    
+    def set_temperture(self,temperature):
+        self.temperature = temperature    
+    
     def toggle_phonons(self):
         self.phonons = not self.phonons
     
@@ -958,19 +966,26 @@ class simulator():
 
     def simulate(self,pulse_object,sim_dt = None, dipole_moment = 1, plot = False):
         pulse_object.set_rotating_frame(self.qd_calibration)
+        self.refresh_num_states()
         if self.dipole_orientation != 0:
             pulse_object = self.hwp.rotate(pulse_object,angle=self.dipole_orientation/2,excecute=False)
         if self.sim_kind.lower() == 'ace':
+            self.decay_scale_x = 0
+            self.decay_scale_y = 0
             self.sim_out = self.ace_four_level(pulse_object,sim_dt,self.decay,self.phonons,plot,dipole_moment)
         
         elif self.sim_kind.lower() == 'ace_ds':
+            self.decay_scale_x = 0
+            self.decay_scale_y = 0
             self.sim_out = self.ace_four_level_ds(pulse_object,sim_dt,self.decay,self.phonons,plot,dipole_moment)
 
         elif self.sim_kind.lower() == 'qutip':
+            self.decay_scale_x = 0
+            self.decay_scale_y = 0
             self.sim_out =  self.qutip_four_level(pulse_object,sim_dt,self.decay,self.phonons,plot,dipole_moment*np.pi)
             
         elif self.sim_kind == 'ace_6ls':
-            self.sim_out = self.ace_six_level(pulse_object,sim_dt,self.decay,self.phonons,plot,dipole_moment)
+            self.sim_out = self.ace_six_level(pulse_object,sim_dt,self.decay,plot,dipole_moment)
         
         else:
             print('No valid simulation kind provided')
@@ -1012,18 +1027,36 @@ class simulator():
             self.photon_emission[3] = np.abs(self.sim_out[4][-1])/2*(1-self.decay_scale_y)
             
         if self.num_states == 6:
-            config = configparser.ConfigParser()
-            config.read(self.qd_calibration)
-            dark_wavelength = float(config['EMISSION']['dark_wavelength'])
-            dark_splitting = pulse_object._Units_inverse(float(config['SPLITTING']['fss_dark'])*1e-3,'meV')
-            dark_splitting = pulse_object._Units(dark_splitting,'nm')
-                                                  
-            self.photon_wavelength[4] =  dark_wavelength + dark_splitting
-            self.photon_wavelength[5] =  dark_wavelength - dark_splitting
-            self.photon_wavelength[6] = self.photon_wavelength[2] + self.photon_wavelength[0]-self.photon_wavelength[4]
-            self.photon_wavelength[7] = self.photon_wavelength[3] + self.photon_wavelength[1]-self.photon_wavelength[5]
+            #print(self.six_ls_energy)
+            new_photon_energy = np.zeros(8)
+            new_photon_energy[0] = self.six_ls_energy[1] - self.six_ls_energy[0]
+            new_photon_energy[1] = self.six_ls_energy[2] - self.six_ls_energy[0]
+            new_photon_energy[2] = self.six_ls_energy[5] - self.six_ls_energy[1]
+            new_photon_energy[3] = self.six_ls_energy[5] - self.six_ls_energy[2]
+            new_photon_energy[4] = self.six_ls_energy[3] - self.six_ls_energy[0]
+            new_photon_energy[5] = self.six_ls_energy[4] - self.six_ls_energy[0]
+            new_photon_energy[6] = self.six_ls_energy[5] - self.six_ls_energy[3]
+            new_photon_energy[7] = self.six_ls_energy[5] - self.six_ls_energy[4]
             
-            # implement decay after lunch 
+            for i in range(8):
+                #print(pulse_object._Units_inverse(pulse_object._Units(new_photon_energy[i],'meV'),'nm'))
+                self.photon_wavelength[i] = pulse_object._Units_inverse(pulse_object._Units(new_photon_energy[i],'meV'),'nm')
+            #for i in range(6):
+                #print(pulse_object._Units_inverse(pulse_object._Units(self.six_ls_energy[i],'meV'),'nm'))
+            #print(self.photon_wavelength)
+            # rethink the emission wavelength.. but looks good
+            
+            # config = configparser.ConfigParser()
+            # config.read(self.qd_calibration)
+            # dark_wavelength = float(config['EMISSION']['dark_wavelength'])
+            # dark_splitting = pulse_object._Units_inverse(float(config['SPLITTING']['fss_dark'])*1e-3,'meV')
+            # dark_splitting = pulse_object._Units(dark_splitting,'nm')
+                                                  
+            # self.photon_wavelength[4] =  dark_wavelength + dark_splitting
+            # self.photon_wavelength[5] =  dark_wavelength - dark_splitting
+            # self.photon_wavelength[6] = self.photon_wavelength[2] + self.photon_wavelength[0]-self.photon_wavelength[4]
+            # self.photon_wavelength[7] = self.photon_wavelength[3] + self.photon_wavelength[1]-self.photon_wavelength[5]
+           
             
             if self.decay:
                 self.photon_emission[4] = np.trapz(x = np.real(self.sim_out[0]),y = np.abs(self.sim_out[5]))
@@ -1087,6 +1120,7 @@ class simulator():
         sim_pulse_object.add_filter_rectangle(transmission=dipole_moment,cap_transmission=False)
         sim_pulse_object.apply_frequency_filter()
         
+        
         if sim_dt is None:
             sim_dt = sim_pulse_object.dt
 
@@ -1104,7 +1138,7 @@ class simulator():
         
         return [np.real(t),np.abs(g),np.abs(x),np.abs(y),np.abs(b)]
     
-    def set_ace_six_level(self, b_x = None, b_z = None, b_field_frame = False):
+    def set_ace_six_level(self, b_x = None, b_z = None, b_field_frame = True):
         if b_x is not None:
             self.b_x = b_x
         else: 
@@ -1125,7 +1159,7 @@ class simulator():
     def toggle_b_field_frame(self):
         self.b_field_frame = not self.b_field_frame
     
-    def ace_six_level(self,pulse_object,sim_dt = None, decay = False, phonons = False,plot = False,dipole_moment = 1):
+    def ace_six_level(self,pulse_object,sim_dt = None, decay = False, plot = False,dipole_moment = 1):
         
         if type(pulse_object) is str:
             pulse_object = pg.load_pulse(pulse_object)
@@ -1140,7 +1174,7 @@ class simulator():
         n = np.ceil(np.log2(10/sim_dt))
         t_mem = sim_dt*2**n
         pulse_x, pulse_y = sim_pulse_object.generate_pulsefiles(temp_dir=self.temp_dir,precision=8) 
-        ds_t, _, ds_occ, _, rho = sixls_linear_dressed_states(sim_pulse_object.t0,sim_pulse_object.tend,dt=sim_dt,pulse_file_x=pulse_x,pulse_file_y=pulse_y,temp_dir=self.temp_dir, suffix='pulse', initial = '|0><0|_6', rf = False, calibration_file = self.qd_calibration, bx = self.b_x, bz = self.b_z, lindblad = decay) 
+        ds_t, _, ds_occ, _, rho = sixls_linear_dressed_states(sim_pulse_object.t0,sim_pulse_object.tend,dt=sim_dt,pulse_file_x=pulse_x,pulse_file_y=pulse_y,temp_dir=self.temp_dir, suffix='pulse', initial = '|0><0|_6', rf = False, calibration_file = self.qd_calibration, bx = self.b_x, bz = self.b_z, lindblad = decay,phonons = self.phonons, ae=self.dot_size, temperature=self.temperature) 
         
         return_vector = [np.real(ds_t)]
         if self.b_field_frame:
@@ -1203,11 +1237,17 @@ class simulator():
         self.decay_scale_y = min(abs(U_x_m[0]))**2
         
         eigenvalue, eigenvector = np.linalg.eig(H)
+        
         index = []
         for vec in eigenvector:
             index.append(np.argmax(np.abs(vec)))
+        
+        self.six_ls_energy = np.real(eigenvalue[index])
+        #print(np.real(eigenvalue[index]))
+        # energy shift -> Monday!!!
+        
         #print(eigenvector.transpose())
-        dress_state_index = np.argsort(eigenvalue)
+        #dress_state_index = np.argsort(eigenvalue)
         #print([0,E_X,E_Y,E_S,E_F,E_B])
         #print(bare_state_index)
         #print(dress_state_index)
@@ -1320,7 +1360,7 @@ class simulator():
         if plot:
             sim_pulse_object.plot_pulses(domain='nm',plot_frequ_intensity=True,sim_input = [t,g,x,y,b],sim_label=['g','x','y','b'])
         
-        return [t,g,x,y,b]
+        return [np.real(t),np.abs(g),np.abs(x),np.abs(y),np.abs(b)]
         # t_axis, g_occ, x_occ, y_occ, b_occ, polar_gx, polar_xb, polar_gb, t_axis, pulse1, pulse2
 
         #tbd

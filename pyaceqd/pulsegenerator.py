@@ -96,7 +96,7 @@ class PulseGenerator:
 
     def set_pulse_power(self,power):
         if self.pulse_power == 0: 
-            print('Initial pulse power is 0.')
+            #print('Initial pulse power is 0.')
             return
         self.clear_filter()
         self.add_filter_rectangle(transmission=np.sqrt(power/self.pulse_power),cap_transmission=False)

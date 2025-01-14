@@ -27,6 +27,7 @@ import csv
 import qutip as qt
 from pyaceqd.tools import read_calibration_file
 import tkinter as tk
+from tkinter import ttk
 from matplotlib.backend_bases import key_press_handler
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg,
                                                NavigationToolbar2Tk)
@@ -195,6 +196,7 @@ class simulator_control():
         
         self.ax_pulses.set_ylim([1.1*np.min([np.real(self.pulse_object.temporal_representation_x),np.real(self.pulse_object.temporal_representation_y)]),1.1*np.max([np.abs(self.pulse_object.temporal_representation_x),np.abs(self.pulse_object.temporal_representation_y)])])
         
+        self.button_color(self.run_button,self.running)
         
         # self.simulation_g_plot.set_xdata(self.simulation_result[0])
         # self.simulation_g_plot.set_ydata(self.simulation_result[1])
@@ -205,13 +207,28 @@ class simulator_control():
         # self.simulation_b_plot.set_xdata(self.simulation_result[0])
         # self.simulation_b_plot.set_ydata(self.simulation_result[4])
         
-
+        
         
         if self.display_simulation:
             self.update_simulation()
-            for i in range(len(self.plot_states_vec)):
-                self.plot_states_vec[i].set_xdata(self.simulation_result[0])
-                self.plot_states_vec[i].set_ydata(self.simulation_result[i+1])
+            if self.simulator_object.get_num_states() != self.old_num_states:
+                self.old_num_states = self.simulator_object.get_num_states()
+                self.plot_states_vec = []
+                self.ax_simulation.clear()
+                self.ax_simulation = self.ax_pulses.twinx()
+                for i in range(self.simulator_object.get_num_states()):
+                    cur_plot, = self.ax_simulation.plot([],[],label='State '+str(i))
+                    if i == 0:
+                        cur_plot.set_color('k')
+                        cur_plot.set_alpha(0.75)
+                    self.plot_states_vec.append(cur_plot)
+                self.ax_simulation.set_ylabel('Population')
+                self.ax_simulation.legend()
+                self.ax_simulation.set_ylim([0,1])
+            if self.running:
+                for i in range(len(self.plot_states_vec)):
+                    self.plot_states_vec[i].set_xdata(self.simulation_result[0])
+                    self.plot_states_vec[i].set_ydata(self.simulation_result[i+1])
         else:
             self.update_previous_control()    
         
@@ -286,6 +303,7 @@ class simulator_control():
         # self.simulation_y_plot, = self.ax_simulation.plot([],[],'r',alpha=1,label='y')
         # self.simulation_b_plot, = self.ax_simulation.plot([],[],'m',alpha=1,label='b')
         
+        self.old_num_states = self.simulator_object.get_num_states()
         self.plot_states_vec = []
         for i in range(self.simulator_object.get_num_states()):
             cur_plot, = self.ax_simulation.plot([],[],label='State '+str(i))
@@ -303,9 +321,9 @@ class simulator_control():
         
         self.canvas.get_tk_widget().grid(row=0,column=0,columnspan=3)
         
-        run_button = tk.Button(self.gui_window, text="Run") 
-        run_button.config(command= lambda: [self.toggle_running(),self.button_color(run_button,self.running),self.set_force_gui_update(),self.update_gui()]) 
-        run_button.grid(row=1,column=0) 
+        self.run_button = tk.Button(self.gui_window, text="Run") 
+        self.run_button.config(command= lambda: [self.toggle_running(),self.button_color(self.run_button,self.running),self.set_force_gui_update(),self.update_gui()]) 
+        self.run_button.grid(row=1,column=0) 
         
         display_simulation_button = tk.Button(self.gui_window, text="Display Simulation")
         display_simulation_button.config(command= lambda: [self.toggle_display_simulation(),self.button_color(display_simulation_button,self.display_simulation)])
@@ -316,7 +334,7 @@ class simulator_control():
         decay_button.grid(row=1,column=2)
         
         # color buttons 
-        self.button_color(run_button,self.running)
+        self.button_color(self.run_button,self.running)
         self.button_color(decay_button,self.decay)
         self.button_color(display_simulation_button,self.display_simulation)
         
@@ -329,8 +347,12 @@ class simulator_control():
         
         tk.Label(master=self.gui_window, text = 'Simulation kind:').grid(row=2,column=1)
         
-        self.simulation_kind_entry = tk.Entry(master = self.gui_window, width = 10)
-        self.simulation_kind_entry.insert(0,self.simulator_kind)
+        # self.simulation_kind_entry = tk.Entry(master = self.gui_window, width = 10)
+        # self.simulation_kind_entry.insert(0,self.simulator_kind)
+        # self.simulation_kind_entry.grid(row=2,column=2)
+        
+        self.simulation_kind_entry = ttk.Combobox(self.gui_window, values=['ace','qutip','ace_6ls'],state='readonly')
+        self.simulation_kind_entry.set(self.simulator_kind)
         self.simulation_kind_entry.grid(row=2,column=2)
     
         dipole_moment_label = tk.Label(master = self.gui_window, text = 'Dipole Moment:').grid(row=3,column=0)
@@ -555,11 +577,57 @@ class simulator_control():
     
     def advanced_options_gui(self):
         
+        def update_emission():
+            #self.update_simulation()
+            self.simulator_object.simulate(pulse_object = self.pulse_object,dipole_moment = self.dipole_moment)
+            self.get_photon_emission_simulation()
+            emission_label = ['X_H->G', 'X_V->G', 'B->X_H', 'B->X_V', 'D_H->G', 'D_V->G','B->D_H','B->D_V']
+            tk.Label(master=self.advanced_window, text = 'Photon emission / nm').grid(row=0,column=3)
+            tk.Label(master=self.advanced_window, text = 'Lifetime / ps').grid(row=0,column=4)
+            for i in range(len(self.photon_wavelength)):
+                tk.Label(master=self.advanced_window, text = emission_label[i]).grid(row=i+1,column=2)
+                tk.Label(master=self.advanced_window, text = str(np.round(self.photon_wavelength[i],decimals=3))).grid(row=i+1,column=3)
+                if i ==0:
+                    tk.Label(master=self.advanced_window, text = str(np.round(self.pulse_object.lifetime_exciton*1/(1-self.simulator_object.decay_scale_x),decimals=3))).grid(row=i+1,column=4)
+                elif i == 1:
+                    tk.Label(master=self.advanced_window, text = str(np.round(self.pulse_object.lifetime_exciton*1/(1-self.simulator_object.decay_scale_y),decimals=3))).grid(row=i+1,column=4)
+                elif i == 2:
+                    tk.Label(master=self.advanced_window, text = str(np.round(self.pulse_object.lifetime_biexciton*1/(1-self.simulator_object.decay_scale_x),decimals=3))).grid(row=i+1,column=4)
+                elif i == 3:
+                    tk.Label(master=self.advanced_window, text = str(np.round(self.pulse_object.lifetime_biexciton*1/(1-self.simulator_object.decay_scale_y),decimals=3))).grid(row=i+1,column=4)
+                elif i == 4:
+                    if self.simulator_object.decay_scale_x == 0:
+                        tk.Label(master=self.advanced_window, text = 'inf').grid(row=i+1,column=4)
+                    else:
+                        tk.Label(master=self.advanced_window, text = str(np.round(self.pulse_object.lifetime_exciton*1/(self.simulator_object.decay_scale_x),decimals=3))).grid(row=i+1,column=4)
+                elif i == 5:
+                    if self.simulator_object.decay_scale_y == 0:
+                        tk.Label(master=self.advanced_window, text = 'inf').grid(row=i+1,column=4)
+                    else:
+                        tk.Label(master=self.advanced_window, text = str(np.round(self.pulse_object.lifetime_exciton*1/(self.simulator_object.decay_scale_y),decimals=3))).grid(row=i+1,column=4)
+                elif i == 6:
+                    if self.simulator_object.decay_scale_x == 0:
+                        tk.Label(master=self.advanced_window, text = 'inf').grid(row=i+1,column=4)
+                    else:
+                        tk.Label(master=self.advanced_window, text = str(np.round(self.pulse_object.lifetime_biexciton*1/(self.simulator_object.decay_scale_x),decimals=3))).grid(row=i+1,column=4)
+                elif i == 7:
+                    if self.simulator_object.decay_scale_y == 0:
+                        tk.Label(master=self.advanced_window, text = 'inf').grid(row=i+1,column=4)
+                    else:
+                        tk.Label(master=self.advanced_window, text = str(np.round(self.pulse_object.lifetime_biexciton*1/(self.simulator_object.decay_scale_y),decimals=3))).grid(row=i+1,column=4)
+                        
+            
         def update_advanced_options():
             self.simulator_object.set_dipole_orientation(float(self.dipole_orientation_entry.get()))
+            self.simulator_object.set_temperature(float(self.temperature_entry.get()))
+            
             if self.simulator_object.get_num_states() == 6:
                 self.simulator_object.set_mag_field(b_x = float(self.mag_field_x_entry.get()),b_z = float(self.mag_field_z_entry.get()))
-            
+                
+            for label in self.advanced_window.grid_slaves():
+                if int(label.grid_info()['column']) >= 2:
+                    label.grid_forget()
+            update_emission()
             pass
         
         self.advanced_window = tk.Toplevel(self.gui_window)
@@ -582,11 +650,21 @@ class simulator_control():
         self.toggle_phonons_button.grid(row=2,column=1)
         self.button_color(self.toggle_phonons_button,self.simulator_object.phonons)
         
+        tk.Label(master=self.advanced_window, text = 'Temperature / K').grid(row=3,column=0)
+        
+        self.temperature_entry = tk.Entry(master=self.advanced_window, width = 20)
+        self.temperature_entry.insert(0,self.simulator_object.temperature)
+        self.temperature_entry.grid(row=3,column=1)
+        
+        
+        update_emission()
+        
         # enable when phonons are implemented
         if not self.simulator_object.phonons:
             self.toggle_phonons_button.config(state='disabled')
+            self.temperature_entry.config(state='disabled')
         
-        num_general_settings = 3
+        num_general_settings = 4
         if self.simulator_object.get_num_states() == 6:
             tk.Label(self.advanced_window, text = '~~~~ Six Level Settings ~~~~').grid(row=num_general_settings,column=0)
             tk.Label(master=self.advanced_window, text = 'Magnetic field Z (T): ').grid(row=num_general_settings+1,column=0)
