@@ -104,10 +104,10 @@ class control_optimizer():
             if self.snipping_bool[i]:
                 control_value = device.get_control_value()
                 self.scan_limits_initial[i] = (control_value - self.snipping_window[i],control_value + self.snipping_window[i])
-                print('snipped')
+                #print('snipped')
             elif self.open_gui:
                 self.scan_limits_initial[i] = (float(self.scan_limit_entries_min[i].get()),float(self.scan_limit_entries_max[i].get()))
-        print(self.scan_limits_initial)
+        #print(self.scan_limits_initial)
         
     def set_scan_limits(self,scan_limits=[]):
         self.scan_limits_initial = scan_limits
@@ -163,16 +163,20 @@ class control_optimizer():
         
     def run_optimization(self):
         self.run_counter = 0
-        measurement_gui_state = self.measururement_control[0].force_gui_update
+        #measurement_gui_state = self.measururement_control[0].force_gui_update
         self.measururement_control[0].force_gui_update = False
+        self.stop_flag = False
         self.optimized_control_values = gp_minimize(self.optimize_function, n_calls = self.num_calls, n_random_starts = self.num_random_starts, dimensions=self.scan_limits, x0=self.get_control_value(),y0=self.optimize_function(self.get_control_value()),initial_point_generator='halton')
         
         self.optimize_function(self.optimized_control_values.x)
-        self.measururement_control[0].force_gui_update = measurement_gui_state
+        self.measururement_control[0].force_gui_update = True #measurement_gui_state
         self.measururement_control[0].update_gui()
         pass
     
     def optimize_function(self, optimize_values:list): 
+        if self.stop_flag:
+            return 0
+        
         self.set_control_value(optimize_values)
         self.update_device_control()
         self.update_measurement_control()
@@ -228,6 +232,7 @@ class control_optimizer():
     #     return intensity #np.sum(intensity_vector)
     
     def run(self):
+        self.run_button.config(state=tk.DISABLED)
         for i, device in enumerate(self.device_control_initial):
             self.device_participating[i] = self.scan_participating_var[i].get()
         
@@ -250,10 +255,18 @@ class control_optimizer():
             #     else:
             #         self.arguments.append(self.measurement_args[i].get())
 
-        
+        self.stop_button.config(state=tk.NORMAL)
         self.run_optimization()
+        self.stop_button.config(state=tk.DISABLED)
+        self.run_button.config(state=tk.NORMAL)
         self.button_color(self.run_button,False)
     
+    def stop_run(self):
+        self.stop_flag = True
+        self.stop_button.config(state=tk.DISABLED)
+        self.run_button.config(state=tk.NORMAL)
+        self.button_color(self.run_button,False)
+        
     def button_color(self, button_object, state):
             if state:
                 button_object.config(bg='green')
@@ -288,6 +301,9 @@ class control_optimizer():
         
         self.run_counter_label = tk.Label(self.gui_window, text='Run Counter: '+str(self.run_counter))
         self.run_counter_label.grid(row=0,column=2)
+        
+        self.stop_button = tk.Button(self.gui_window, text='Stop', command=self.stop_run, state=tk.DISABLED)
+        self.stop_button.grid(row=0,column=3)
         
         tk.Label(self.gui_window, text='Number of Calls').grid(row=1,column=0)
         self.num_calls_entry = tk.Entry(self.gui_window)

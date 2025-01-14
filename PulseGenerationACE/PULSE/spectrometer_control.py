@@ -27,6 +27,7 @@ import csv
 import qutip as qt
 from pyaceqd.tools import read_calibration_file
 import tkinter as tk
+import tkinter.ttk as ttk
 from matplotlib.backend_bases import key_press_handler
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg,
                                                NavigationToolbar2Tk)
@@ -75,6 +76,22 @@ class spectrometer_control:
             self.excecute = True
         else:
             self.excecute = False
+        
+        if self.simulation_control is not None:
+            self.simulation_object = []
+            if type(self.simulation_control) is not list:
+                self.simulation_control = [self.simulation_control]
+            for j in range(len(self.simulation_control)):
+                self.simulation_control[j].update_previous_control()
+                if self.display_simulation:
+                    if self.simulation_control[j].open_gui:
+                        self.simulation_control[j].running = True
+                        self.simulation_control[j].force_gui_update = False
+                        #self.simulation_control[j].display_simulation = True
+                        self.simulation_control[j].update_gui()
+                    else:
+                        self.simulation_control[j].update_simulation()
+                self.simulation_object.append(self.simulation_control[j].get_simulator_object())
         
         self.force_gui_update = True
         
@@ -193,9 +210,9 @@ class spectrometer_control:
                 self.simulation_control[j].update_previous_control()
                 if self.display_simulation:
                     if self.simulation_control[j].open_gui:
-                        self.simulation_control[j].running = True
+                        #self.simulation_control[j].running = True
                         self.simulation_control[j].force_gui_update = False
-                        self.simulation_control[j].display_simulation = True
+                        #self.simulation_control[j].display_simulation = True
                         self.simulation_control[j].update_gui()
                     else:
                         self.simulation_control[j].update_simulation()
@@ -331,7 +348,9 @@ class spectrometer_control:
         control.measurement_args_spec[1].insert(0,str(self.measurement_arguments[1]))
         
         tk.Label(control.gui_window, text='Method: ').grid(row=row_offset+4,column=0+column_offset)
-        control.measurement_args_spec[2] = tk.Entry(control.gui_window)
+        #control.measurement_args_spec[2] = tk.Entry(control.gui_window)
+        control.measurement_args_spec[2] = ttk.Combobox(control.gui_window, values=['max','mean','sum'], state='readonly')
+        control.measurement_args_spec[2].current(0)
         control.measurement_args_spec[2].grid(row=row_offset+4,column=1+column_offset)
         control.measurement_args_spec[2].insert(0,self.measurement_arguments[2])
         
@@ -386,7 +405,9 @@ class spectrometer_control:
             control.measurement_args_spec[-1].grid(row=row_offset+3,column=1+column_offset+i)
             control.measurement_args_spec[-1].insert(0,str(self.measurement_arguments[2+i*4]))
             
-            control.measurement_args_spec.append(tk.Entry(control.gui_window))
+            #control.measurement_args_spec.append(tk.Entry(control.gui_window))
+            control.measurement_args_spec.append(ttk.Combobox(control.gui_window, values=['max','mean','sum'], state='readonly'))
+            control.measurement_args_spec[-1].current(0)
             control.measurement_args_spec[-1].grid(row=row_offset+4,column=1+column_offset+i)
             control.measurement_args_spec[-1].insert(0,str(self.measurement_arguments[3+i*4]))
             
