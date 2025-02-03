@@ -74,7 +74,7 @@ class create_experiment():
         pass
 
 class time_delay():
-    def __init__(self,device = None,name='Time Delay',save = False,experiment = None,time_delay_sleep = 0, unit = 1, offset = 0, num_passes = 1) -> None:
+    def __init__(self,device = None,name='Time Delay',save = False,experiment = None,time_delay_sleep = 0, scale = 1, offset = 0, num_passes = 1, unit = 'mm') -> None:
         self.name = name
         self.device = device
         self.time_of_creation = datetime.now()
@@ -84,9 +84,10 @@ class time_delay():
         _check_method(device,'set_position')
         _check_method(device,'close')
         
-        self.unit = unit # in mm 
+        self.scale = scale # in mm 
         self.offset = offset # in ps 
         self.num_passes = num_passes # number of passes, e.g. backrefector = 2    
+        self.unit = unit
 
         if save:
             save_device(self, self.name,suffix = self.suffix,experiment = experiment)
@@ -94,7 +95,7 @@ class time_delay():
     def convert_ps_to_mm(self):
         c = 0.299792 # mm per ps
         self.motor_delay =c*(self.delay/self.num_passes -self.offset)
-        self.motor_delay = self.motor_delay/self.unit
+        self.motor_delay = self.motor_delay/self.scale
     
     def get_offset(self):
         return self.offset
@@ -111,7 +112,10 @@ class time_delay():
                 self.delay = delay
     
             if excecute:
-                self.convert_ps_to_mm()
+                if self.unit == 'mm':
+                    self.convert_ps_to_mm()
+                elif self.unit == 'ps':
+                    self.motor_delay = self.delay/self.scale - self.offset
                 self.device.set_position(self.motor_delay, excecute = excecute) 
     
             if pulse_object is not None:
@@ -753,6 +757,7 @@ class generic_wave_plate():
     
     def rotate(self,pulse_object = None, angle=0, excecute=False):
         if excecute:
+            self.device.set_position(angle, excecute = excecute)
             #print('To do')
             pass
         
@@ -1200,6 +1205,76 @@ class simulator():
         #                       verbose=False,initial='|5><5|_6',
                             # lindblad=False,rf = True, rf_file = ph_x,bx=bx,temperature = 1.5, ae = 5, phonons = False,
                             #  calibration_file=calib_file, make_transparent=[0,2,4])
+    
+    def light_dressed_states(self,pulse_object):
+        if type(pulse_object) is str:
+            pulse_object = pg.load_pulse(pulse_object)
+        sim_pulse_object = pulse_object.copy_pulse()
+        E_X, E_Y, E_S, E_F, E_B, _, _, g_ex, g_hx, g_ez, g_hz = read_calibration_file(self.qd_calibration)
+        mu_b = 5.7882818012e-2   # meV/T
+        hbar = 0.6582173  # meV*ps
+        #field_x, field_y = sim_pulse_object.generate_field_functions() # _lab_frame
+        
+        
+        if self.num_states == 4:
+            energy_mat = [[],[],[],[]]
+            def H_func(field_x,field_y):
+                H = np.array([[0,field_x,field_y,0],
+                            [np.conj(field_x),E_X,0,field_x],
+                            [np.conj(field_y),0,E_Y,field_y],
+                            [0,np.conj(field_x),np.conj(field_y),E_B]],dtype=complex)
+                
+                
+                return H
+        elif self.num_states == 6:
+            energy_mat = [[],[],[],[],[],[]]
+            A = -0.5*mu_b*self.b_x*(g_ex+g_hx)
+            B = -0.5*mu_b*self.b_x*(g_ex-g_hx) 
+            
+            C = -1j*0.5*mu_b*self.b_z*(g_ez-3*g_hz)
+            D = 1j*0.5*mu_b*self.b_z*(g_ez+3*g_hz)
+            def H_func(field_x,field_y):
+                H = np.array([[0,field_x,field_y,0,0,0],
+                    [np.conj(field_x),E_X,C,A,0,field_x],
+                    [np.conj(field_y),-C,E_Y,0,B,field_y],
+                    [0,A,0,E_S,D,0],
+                    [0,0,B,-D,E_F,0],
+                    [0,np.conj(field_x),np.conj(field_y),0,0,E_B]],dtype=complex)
+                return H
+        
+        #self.system_hamiltonian = H_func(0,0)
+        
+        for i, t in enumerate(sim_pulse_object.time):
+            eigenvalue, eigenvector = np.linalg.eig(H_func(sim_pulse_object.temporal_representation_x[i],sim_pulse_object.temporal_representation_y[i]))
+            index = []
+            for vec in eigenvector:
+                index.append(np.argmax(np.abs(vec)))
+            for i in range(self.num_states):
+                energy_mat[i].append(np.real(eigenvalue[index[i]]))
+                
+        return [sim_pulse_object.time,energy_mat]
+    
+    # def save_system_hamiltonian_numpy(self,filename):
+    #     np.save(filename,self.system_hamiltonian)
+    
+    # def save_system_hamiltonian_txt(self,filename):
+    #     if self.sim_kind == 'ace':
+    #         system_ham_save_str = np.array([])
+            
+    #         for i in range(self.num_states):
+    #             for j in range(self.num_states):
+    #                  #"{}*(|1><3|_6 + |3><1|_6 )".format(-0.5*mu_b*bx*(g_ex+g_hx))
+    #                 system_ham_save_str.append(str(self.system_hamiltonian[i,j])+' ')
+            
+    #     elif self.sim_kind == 'qutip':
+    #         pass
+    #     else: 
+    #         self.save_system_hamiltonian_numpy(filename)
+            
+        
+        
+        
+        
     
     def bx_field_basis_transformation(self,rho,bx,calibration_file, bz = 0): 
         E_X, E_Y, E_S, E_F, E_B, _, _, g_ex, g_hx, g_ez, g_hz = read_calibration_file(calibration_file)
@@ -1716,6 +1791,8 @@ def polarising_beam_splitter(pulse_object_1,pulse_object_2 = None):
     pulse_out_1_1.merge_pulses(pulse_out_2_1)
     pulse_out_2_2.merge_pulses(pulse_out_1_2)
 
+    pulse_out_1_1.clear_filter()
+    pulse_out_2_2.clear_filter()
     return pulse_out_1_1, pulse_out_2_2
   
 
@@ -1757,6 +1834,9 @@ def beam_splitter(pulse_object_1, pulse_object_2 = None, transmission = 0.5, ref
     pulse_out_1_1.merge_pulses(pulse_out_2_1)
     pulse_out_2_2.merge_pulses(pulse_out_1_2)
 
+    pulse_out_1_1.clear_filter()
+    pulse_out_2_2.clear_filter()
+    
     return pulse_out_1_1, pulse_out_2_2
     
     

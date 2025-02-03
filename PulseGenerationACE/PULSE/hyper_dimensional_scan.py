@@ -358,13 +358,13 @@ class hyper_scan():
         self.save_name_entry.delete(0, tk.END)
         self.save_name_entry.insert(0, self.save_name)
         #up to 3 dimensional scans can be live plotted 
-        if len(self.device_control) <= 3:
-            self.live_plot_checkbox.config(state=tk.DISABLED)
-            self.live_plot_settings.config(state=tk.NORMAL)
-        else:
-            self.live_plot_checkbox.config(state=tk.DISABLED)
-            self.live_plot.set(False)
-            self.live_plot_settings.config(state=tk.DISABLED)
+        #if len(self.device_control) <= 3:
+        self.live_plot_checkbox.config(state=tk.DISABLED)
+        self.live_plot_settings.config(state=tk.NORMAL)
+        # else:
+        #     self.live_plot_checkbox.config(state=tk.DISABLED)
+        #     self.live_plot.set(False)
+        #     self.live_plot_settings.config(state=tk.DISABLED)
         
         
         #self.live_plot_settings.config(state=tk.NORMAL)
@@ -379,6 +379,7 @@ class hyper_scan():
         self.save_name_entry.delete(0, tk.END)
         self.save_name_entry.insert(0, self.save_name)
         #
+        self.live_plot.set(False)
         self.live_plot_checkbox.config(state=tk.DISABLED)
         self.live_plot_settings.config(state=tk.DISABLED)
         self.stop_button.config(state=tk.DISABLED)
@@ -508,6 +509,8 @@ class hyper_scan():
         
     def live_plot_settings_gui(self):
         self.lp_dimensions = np.min([len(self.device_control),3])
+        if len(self.device_control) > 3:
+            self.lp_dimensions = 1
         self.lp_windows = []
         self.lp_data = []
         self.live_plot_update_rate = 3
