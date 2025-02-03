@@ -40,6 +40,8 @@ lab_motor3 = motor(fake_motor(),name='motor3')
 lab_motor4 = motor(fake_motor(),name='motor4')
 lab_motor5 = motor(fake_motor(),name='motor5')
 lab_motor6 = motor(fake_motor(),name='motor6')
+lab_motor7 = motor(fake_motor(),name='motor7')
+lab_motor8 = motor(fake_motor(),name='motor8')
 
 lab_att2 = fake_attenuator()
 
@@ -76,7 +78,7 @@ att_B = 0.5#0# 0.622
 ps_C = 780.8#780.8 #777.961
 att_D = 0.5
 delay_F = 0 #-90 
-dipole = 2
+dipole = 1
 
 
 initial_pulse = pg.PulseGenerator(t_0,t_end,dt,calibration_file=qd_calibration)
@@ -86,14 +88,14 @@ initial_pulse2 = initial_pulse.copy_pulse()
 
 initial_pulse.add_filter_rectangle()
 initial_pulse.add_phase_filter(unit='nm', phase_taylor=[0,0,chirp_1],central_f=780.8)
-initial_pulse.add_filter_double_erf(unit='nm', central_f=779.89, width_f=0.35, rise_f=0.1, invert=True,merging='*')
-initial_pulse.add_filter_double_erf(unit='nm', central_f=781.79, width_f=0.35, rise_f=0.1, invert=True,merging='*')
+#initial_pulse.add_filter_double_erf(unit='nm', central_f=779.89, width_f=0.35, rise_f=0.1, invert=True,merging='*')
+#initial_pulse.add_filter_double_erf(unit='nm', central_f=781.79, width_f=0.35, rise_f=0.1, invert=True,merging='*')
 initial_pulse.apply_frequency_filter()
 
 initial_pulse2.add_filter_rectangle()
 initial_pulse2.add_phase_filter(unit='nm', phase_taylor=[0,0,chirp_2],central_f=780.8)
-initial_pulse2.add_filter_double_erf(unit='nm', central_f=779.89, width_f=0.35, rise_f=0.1, invert=True,merging='*')
-initial_pulse2.add_filter_double_erf(unit='nm', central_f=781.79, width_f=0.35, rise_f=0.1, invert=True,merging='*')
+#initial_pulse2.add_filter_double_erf(unit='nm', central_f=779.89, width_f=0.35, rise_f=0.1, invert=True,merging='*')
+#initial_pulse2.add_filter_double_erf(unit='nm', central_f=781.79, width_f=0.35, rise_f=0.1, invert=True,merging='*')
 initial_pulse2.apply_frequency_filter()
 
 ipA_control = ip.Pulse_Generator(initial_pulse = initial_pulse, name='initial_pulse_A')
@@ -105,8 +107,8 @@ pulse_shaper = pulse_shaper_obj(device=lab_motor, calibration_file=ps_calibratio
 delay_A = time_delay(device=lab_motor6, name='A: Delay stage')
 att_object = attenuator(lab_att, name = 'A: Attenuator')
 
-hwp_2 = generic_wave_plate(device=lab_motor4, name='B: HWP')
-qwp_2 = generic_wave_plate(device=lab_motor5, name='B: QWP',phase=np.pi/2)
+hwp_2 = generic_wave_plate(device=lab_motor7, name='B: HWP')
+qwp_2 = generic_wave_plate(device=lab_motor8, name='B: QWP',phase=np.pi/2)
 pulse_shaper2 = pulse_shaper_obj(device=lab_motor2, calibration_file=ps_calibration, name='B: Pulse shaper2')
 att_object2 = attenuator(lab_att, name = 'B: Attenuator2')
 
@@ -155,20 +157,26 @@ sm_controller.gui()
 
 #sm_controller.update_gui()
 
-power_meter_M2 = power_meter(fake_power_meter(),name='power_meter_A')
-power_meter_M2_control = power_meter_M2.open_control(previous_control=[att_controller,delay_controller],open_gui=False)
+power_meter_M2 = power_meter(fake_power_meter(),name='A: power_meter')
+power_meter_M2_control = power_meter_M2.open_control(previous_control=[att_controller],open_gui=True)
+
+power_meter_M3 = power_meter(fake_power_meter(),name='B: power_meter')
+power_meter_M3_control = power_meter_M3.open_control(previous_control=[delay_controller],open_gui=True)
+
+power_meter_M4 = power_meter(fake_power_meter(),name='AB: power_meter')
+power_meter_M4_control = power_meter_M4.open_control(previous_control=[att_controller,delay_controller],open_gui=True)
 
 device_list = [ps_controller,att_controller, ps_controller2,att_controller2,delay_controller,hwp_1_controller,qwp_1_controller,hwp_2_controller,qwp_2_controller]
 
 co = con_opt.control_optimizer(device_control=device_list,measururement_control=sm_controller,measurement_kind='spectrometer',open_gui=False) # ,delay_controller , ps_controller,att_controller
 co.set_scan_limits([(778.8,779.2),(0.01,1), (777.8,778.2),(0.01,1), (0,20)]) #,(-10,10) ,(778.8,779.2),(0.01,1)
 sm_controller.set_measurement_method('multi line', arg=2)
-sm_controller.set_measurement_arguments(arguments=[2,779.95, 0.01, 'max','',781.79, 0.01, 'max',0])
+sm_controller.set_measurement_arguments(arguments=[2,781.79, 0.01, 'max','',781.79, 0.01, 'max','']) # dark 779.95
 #co.set_spectrometer_measurement(779.95,0.01,method='max')
 co.gui()
 
-scan = hds.hyper_scan(device_control=[ps_controller,att_controller, ps_controller2,att_controller2,delay_controller,hwp_1_controller,qwp_1_controller,hwp_2_controller, qwp_2_controller],measururement_control=[sm_controller, power_meter_M2_control],open_gui=True) #, ps_controller,att_controller
+scan = hds.hyper_scan(device_control=[ps_controller,att_controller, ps_controller2,att_controller2,delay_controller,hwp_1_controller,qwp_1_controller,hwp_2_controller, qwp_2_controller],measururement_control=[sm_controller, power_meter_M2_control, power_meter_M3_control,power_meter_M4_control],open_gui=True) #, ps_controller,att_controller
 
-gui_m = gui_manager(device_control=[ipA_control,ipB_control,ps_controller,att_controller,del_controller, ps_controller2,att_controller2,delay_controller, sm_controller, sim_controller,hwp_1_controller, qwp_1_controller, hwp_2_controller, qwp_2_controller, co, scan],num_coloums=2)
+gui_m = gui_manager(device_control=[ipA_control,ipB_control,ps_controller,att_controller,del_controller, ps_controller2,att_controller2,delay_controller, sm_controller, sim_controller,hwp_1_controller, qwp_1_controller, hwp_2_controller, qwp_2_controller,power_meter_M2_control, power_meter_M3_control,power_meter_M4_control, co, scan],num_coloums=2)
 #co.run_optimization()
 sm_controller.start_gui()

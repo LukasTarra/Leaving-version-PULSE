@@ -65,12 +65,12 @@ class simulator_control():
         self.name = self.simulator_object.name
         
         self.force_gui_update = True
+        self.dressed_states_flag = False
         
         self.print_info()
         self.update_previous_control()
         if self.open_gui:
-            print('hier könnte ihre GUI stehen!')
-            return self.gui()
+            self.gui()
     
     def update_previous_control(self):
         # if self.previous_control is not None:
@@ -117,6 +117,10 @@ class simulator_control():
     
     def set_save_folder(self,folder):
         self.save_folder = folder
+    
+    def toggle_dressed_states(self):
+        self.dressed_states_flag = not self.dressed_states_flag
+        pass
     
     def toggle_force_gui_update(self):
         self.force_gui_update = not self.force_gui_update
@@ -207,6 +211,8 @@ class simulator_control():
         # self.simulation_b_plot.set_xdata(self.simulation_result[0])
         # self.simulation_b_plot.set_ydata(self.simulation_result[4])
         
+        if self.dressed_states_flag:
+            self.update_states_gui()
         
         
         if self.display_simulation:
@@ -230,7 +236,11 @@ class simulator_control():
                     self.plot_states_vec[i].set_xdata(self.simulation_result[0])
                     self.plot_states_vec[i].set_ydata(self.simulation_result[i+1])
         else:
-            self.update_previous_control()    
+            self.update_previous_control()  
+            if self.running:
+                for i in range(len(self.plot_states_vec)):
+                    self.plot_states_vec[i].set_xdata([])
+                    self.plot_states_vec[i].set_ydata([])
         
         
         
@@ -390,9 +400,80 @@ class simulator_control():
         self.advanced_options_button.config(command= lambda: [self.advanced_options_gui()])
         self.advanced_options_button.grid(row=6,column=0)
         
+        self.dressed_states_button = tk.Button(self.gui_window, text='Energy view')
+        self.dressed_states_button.config(command= lambda: [self.toggle_dressed_states(),self.dressed_states_gui(),self.button_color(self.dressed_states_button,self.dressed_states_flag)])
+        self.dressed_states_button.grid(row=6,column=1)
+        self.button_color(self.dressed_states_button,self.dressed_states_flag)
+        
         if self.running:
             self.update_gui()
 
+    def dressed_states_gui(self):
+        states_window = tk.Toplevel(self.gui_window)
+        states_window.title('Dressed States (Beta)')
+        
+        def close_window():
+            self.dressed_states_flag = False
+            self.button_color(self.dressed_states_button,self.dressed_states_flag)
+            states_window.destroy()
+        
+        states_window.protocol("WM_DELETE_WINDOW", close_window)
+        
+        states_fig = Figure(figsize=(5, 4), dpi=100)
+        self.ax_states = states_fig.add_subplot()
+        
+        self.states_plot = []
+        for i in range(self.simulator_object.get_num_states()):
+            cur_plot, = self.ax_states.plot([],[],label='State '+str(i))
+            if i == 0:
+                cur_plot.set_color('k')
+                cur_plot.set_alpha(0.75)
+            self.states_plot.append(cur_plot)
+        
+        self.ax_states.set_xlabel('Time (ps)')
+        self.ax_states.set_ylabel('Energy (meV)')
+        self.ax_states.legend()
+        
+        self.canvas_states = FigureCanvasTkAgg(states_fig, master=states_window)  # A tk.DrawingArea.
+        self.canvas_states.draw()
+        self.canvas_states.get_tk_widget().grid(row=0,column=0,rowspan=self.simulator_object.get_num_states())
+        
+        self.states_plot_vec = []
+        self.states_plot_button_vec = []
+        
+        def toggle_state_plot(i):
+            self.states_plot_vec[i] = not self.states_plot_vec[i]
+        
+        for i in range(self.simulator_object.get_num_states()):
+            self.states_plot_vec.append(True)
+            cur_button = tk.Button(states_window, text='State '+str(i))
+            cur_button.config(command= lambda i=i: [toggle_state_plot(i),self.button_color(self.states_plot_button_vec[i],self.states_plot_vec[i])])
+            cur_button.grid(row=i,column=1)
+            self.button_color(cur_button,self.states_plot_vec[i])
+            self.states_plot_button_vec.append(cur_button)
+            
+        self.update_states_gui()
+    
+    def update_states_gui(self):
+        plot_time, plot_energy = self.simulator_object.light_dressed_states(self.pulse_object)
+        min_energy = 0
+        max_energy = 0
+        for i in range(self.simulator_object.get_num_states()):
+            if self.states_plot_vec[i]:
+                self.states_plot[i].set_xdata(plot_time)
+                self.states_plot[i].set_ydata(plot_energy[i])
+                if np.min(plot_energy[i]) < min_energy:
+                    min_energy = np.min(plot_energy[i])
+                if np.max(plot_energy[i]) > max_energy:
+                    max_energy = np.max(plot_energy[i])
+            else:
+                self.states_plot[i].set_xdata([])
+                self.states_plot[i].set_ydata([])
+        
+        self.ax_states.set_xlim([np.min(plot_time),np.max(plot_time)])
+        self.ax_states.set_ylim([min_energy,max_energy])
+        self.canvas_states.draw()
+    
     def change_qd_calibration(self):
         config = configparser.ConfigParser()
         config.read(self.simulator_object.qd_calibration) 

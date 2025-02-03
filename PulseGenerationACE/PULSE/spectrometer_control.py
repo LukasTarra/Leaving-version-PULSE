@@ -57,6 +57,8 @@ class spectrometer_control:
         self.simulation_gaussian_noise = 0
         self.poissonian_noise = False
         
+        self.save_pulse_flag = False
+        
         self.simulation_mode_combined = False
         
         self.date_str_create = datetime.now().strftime("%Y_%m_%d_%H_%M")
@@ -99,6 +101,13 @@ class spectrometer_control:
         self.update_previous_control()
         self.set_measurement_method(method='single line')
         self.set_measurement_arguments()
+        self.set_xlim(np.min(self.spectrometer_object.exp_wl_0),np.max(self.spectrometer_object.exp_wl_0))  
+        
+        self.y_lim_min_exp = 0
+        self.y_lim_max_exp = 1
+        
+        self.y_lim_min = 0
+        self.y_lim_max = 1
         if self.open_gui:
             print('hier könnte ihre GUI stehen!')
             self.gui(parentWindow=parent_window)
@@ -296,7 +305,7 @@ class spectrometer_control:
         if self.display_experiment:
             wavelength = self.wavelength_experiment
             intensity = self.intensity_experiment
-        elif self.display_pulse and self.display_simulation:
+        elif (self.display_pulse and self.display_simulation) or self.simulation_mode_combined:
             wavelength = self.wavelength_pulse
             intensity = self.combined_pulse_simulation
         elif self.display_pulse:
@@ -325,6 +334,16 @@ class spectrometer_control:
         print('Measurement: '+str(measurement))
         if self.spec_during_meas:
             self.save_spectrum()
+        
+        #print('save pulse flag: '+str(self.save_pulse_flag))
+        if self.save_pulse_flag: 
+            now = datetime.now().strftime("%Y_%m_%d_%H_%M_%S_%f")
+            save_name = self.save_folder+'/'+'pulse_'+now
+            #print('save pulse')
+            if not os.path.exists(self.save_folder):
+                os.makedirs(self.save_folder)
+                
+            self.pulse_object.save_pulse(save_name = save_name)
         return self.measurment
     
     def get_measurement_result(self):
@@ -363,21 +382,45 @@ class spectrometer_control:
         control.spec_meas_button = tk.Button(control.gui_window, text='Record Spectrum')
         control.spec_meas_button.config(command= lambda: [self.toggle_spec_during_meas(),self.button_color(control.spec_meas_button,self.spec_during_meas)])
         control.spec_meas_button.grid(row=row_offset+2,column=2+column_offset)
+        self.button_color(control.spec_meas_button,self.spec_during_meas)
         
+        control.save_pulse_button = tk.Button(control.gui_window, text='Save Pulse')
+        control.save_pulse_button.config(command= lambda: [self.toggle_save_pulse_flag(),self.button_color(control.save_pulse_button,self.save_pulse_flag)])
+        control.save_pulse_button.grid(row=row_offset+3,column=2+column_offset)
+        self.button_color(control.save_pulse_button,self.save_pulse_flag)
+        if self.pulse_object is None:
+            control.save_pulse_button.config(state='disabled')
         return num_rows
     
     def multi_line_measurement(self,arguments = []):
         output_list = []
+        state_save_spec = self.spec_during_meas
+        state_save_pulse = self.save_pulse_flag
+        self.spec_during_meas = False # Such a stupid fix... do better
+        self.save_pulse_flag = False
         for i in range(int(arguments[0])):
             center_wl =  float(arguments[1+i*4])
             width_wl = float(arguments[2+i*4])
             method = str(arguments[3+i*4])
             target = str(arguments[4+i*4])
+            if i == int(arguments[0])-1:
+                self.spec_during_meas = state_save_spec
+                self.save_pulse_flag = state_save_pulse
+            #print('Line '+str(i+1))
+            #print(self.save_pulse_flag)
             output_list.append(self.single_line_measurement([center_wl,width_wl,method,target]))
         
         self.measurment = output_list
-        if self.spec_during_meas:
-            self.save_spectrum()
+        # if self.spec_during_meas:
+        #     self.save_spectrum()
+            
+        # if self.save_pulse_flag: 
+        #     now = datetime.now().strftime("%Y_%m_%d_%H_%M")
+        #     save_name = self.save_folder+'/'+'pulse_'+now
+        #     if not os.path.exists(self.save_folder):
+        #         os.makedirs(self.save_folder)
+            
+        #     self.pulse_object.save_pulse(save_name = save_name)
         return self.measurment
     
     def multi_line_measurement_gui(self, control = None, row_offset = 0, column_offset = 0):
@@ -418,6 +461,15 @@ class spectrometer_control:
         control.spec_meas_button = tk.Button(control.gui_window, text='Record Spectrum')
         control.spec_meas_button.config(command= lambda: [self.toggle_spec_during_meas(),self.button_color(control.spec_meas_button,self.spec_during_meas)])
         control.spec_meas_button.grid(row=row_offset+2,column=2+column_offset+i)
+        self.button_color(control.spec_meas_button,self.spec_during_meas)
+        
+        control.save_pulse_button = tk.Button(control.gui_window, text='Save Pulse')
+        control.save_pulse_button.config(command= lambda: [self.toggle_save_pulse_flag(),self.button_color(control.save_pulse_button,self.save_pulse_flag)])
+        control.save_pulse_button.grid(row=row_offset+3,column=2+column_offset+i)
+        self.button_color(control.save_pulse_button,self.save_pulse_flag)
+        if self.pulse_object is None:
+            control.save_pulse_button.config(state='disabled')
+        
         return num_rows 
         
     
@@ -457,6 +509,10 @@ class spectrometer_control:
         for i in range(len(control.measurement_args_spec)):
             args.append(control.measurement_args_spec[i].get())
         return args
+    
+    def set_xlim(self, min_wl, max_wl):
+        self.x_lim_min = min_wl
+        self.x_lim_max = max_wl
     
     def print_info(self):
         print('Spectrometer Control')
@@ -648,16 +704,11 @@ class spectrometer_control:
         
         
         self.ax_experiment.set_xlabel('Wavelength [nm]')
-        self.x_lim_min = np.min(self.spectrometer_object.exp_wl_0)
-        self.x_lim_max = np.max(self.spectrometer_object.exp_wl_0)
+        
         self.ax_experiment.set_xlim(self.x_lim_min,self.x_lim_max)
         
-        self.y_lim_min_exp = 0
-        self.y_lim_max_exp = 1
         self.ax_experiment.set_ylim(self.y_lim_min_exp,self.y_lim_max_exp)
         
-        self.y_lim_min = 0
-        self.y_lim_max = 1
         self.ax_simulation.set_ylim(self.y_lim_min,self.y_lim_max)
         
         self.canvas_fig_spec = FigureCanvasTkAgg(fig_spectrometer, master=self.gui_window)
@@ -793,12 +844,15 @@ class spectrometer_control:
         if self.running:
             self.update_gui()
     
+    def toggle_save_pulse_flag(self):
+        self.save_pulse_flag = not self.save_pulse_flag
+    
     def settings_gui(self):
         self.settings_window = tk.Toplevel(self.gui_window)
         self.settings_window.title('Spectrometer settings')
         #self.settings_window.protocol("WM_DELETE_WINDOW", self.settings_window.withdraw)
         
-        self.set_settings_button = tk.Button(self.settings_window, text='Set Settings')
+        self.set_settings_button = tk.Button(self.settings_window, text='Apply')
         self.set_settings_button.config(command= lambda: [self.set_settings(float(self.min_wavelength_entry.get()),float(self.max_wavelength_entry.get()),float(self.simulation_background_entry.get()),float(self.simulation_gaussian_noise_entry.get()),self.poissonian_noise, float(self.simulation_counts_entry.get()), float(self.pulse_scale_entry.get()) ,float(self.min_exp_entry.get()), float(self.max_exp_entry.get()), float(self.min_sim_entry.get()), float(self.max_sim_entry.get()), self.lp_angle_entry.get())])
         self.set_settings_button.grid(row=0,column=0)
         
@@ -917,11 +971,14 @@ class spectrometer_control:
         
         pass
         
-        
+    def set_polarisation(self, angle = None):
+        self.spectrometer_object.set_polarisation(angle)
+        pass  
     
     def save_spectrum_gui(self):
         self.set_save_folder(self.folder_entry.get())
         self.save_spectrum()
+        
     
     def save_spectrum(self):
         now = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
@@ -936,6 +993,9 @@ class spectrometer_control:
             for i in range(len(self.wavelength_experiment)):
                 writer.writerow([self.wavelength_experiment[i],self.intensity_experiment[i],self.intensity_pulse[i],self.intensity_simulation[i]])
         file.close()
+        
+        
+            
     
     
     
