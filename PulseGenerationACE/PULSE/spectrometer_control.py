@@ -288,7 +288,20 @@ class spectrometer_control:
             self.intensity_simulation += noise
             self.combined_pulse_simulation += noise
             
-        
+    def get_wavelength_intensity(self):
+        if self.display_experiment:
+            wavelength = self.wavelength_experiment
+            intensity = self.intensity_experiment
+        elif (self.display_pulse and self.display_simulation) or self.simulation_mode_combined:
+            wavelength = self.wavelength_pulse
+            intensity = self.combined_pulse_simulation
+        elif self.display_pulse:
+            wavelength = self.wavelength_pulse
+            intensity = self.intensity_pulse
+        elif self.display_simulation:
+            wavelength = self.wavelength_simulation
+            intensity = self.intensity_simulation
+        return wavelength, intensity
         
     def single_line_measurement(self,arguments =[]):
         # measurment_kind = 0: experiment, 1: pulse, 2: simulation, 3: combined 

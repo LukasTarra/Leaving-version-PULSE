@@ -55,7 +55,7 @@ initial_wavelength_A = 896.5 # tpe pulse
 initial_wavelength_B = 898 # stim pulse
 
 initial_pulse = pg.PulseGenerator(t_0,t_end,dt,calibration_file=qd_calibration)
-initial_pulse.add_gaussian_time(unit = 'Hz', central_f= initial_pulse.tpe_resonance, width_t=0.13,t0=t_end/2,area_time=5, polarisation=[1,0]) # <-- more power for tpe 
+initial_pulse.add_gaussian_time(unit = 'Hz', central_f= initial_pulse.tpe_resonance, width_t=0.2,t0=t_end/2,area_time=5, polarisation=[1,0]) # <-- more power for tpe 
 
 initial_pulse.add_filter_double_erf(unit='nm', central_f= 896.5, width_f= 0.3, rise_f=0.05, invert=True)
 initial_pulse.apply_frequency_filter()
@@ -117,6 +117,11 @@ spectrometer_control_M1.y_lim_max = 5500
 
 spectrometer_control_M1.gui()
 #spectrometer_control_M1.ax_simulation.set_xlim([896, 900])
+
+# ----- add spectrometer to ipA_control  and starting the gui-----
+ipA_control.set_spectrometer_control(spectrometer_control_M1)
+ipA_control.gui()
+
 # ----- power meter -----
 power_meter_control_M2 = power_meter_M2.open_control(previous_control=[att_control_A])
 
