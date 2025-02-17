@@ -38,7 +38,7 @@ from skopt import gp_minimize
 
 
 class control_optimizer():
-    def __init__(self, device_control: list = [], measururement_control: list = [], scan_limits = [], measurement_kind = 'spectrometer', num_calls = 20, num_random_starts = 10, open_gui = True, active_measurement_index = 0, name = 'control_optimizer') -> None: 
+    def __init__(self, device_control: list = [], measururement_control: list = [], scan_limits = [], measurement_kind = 'spectrometer', num_calls = 20, num_random_starts = 10, open_gui = True, active_measurement_index = 0, name = 'control_optimizer', default_participating = True, default_snipping = True) -> None: 
         
         if type(device_control) != list:
             device_control = [device_control]
@@ -62,9 +62,9 @@ class control_optimizer():
         self.snipping_window = []
         self.snipping_bool = []
         for i in range(len(device_control)):
-            self.device_participating.append(True)
+            self.device_participating.append(default_participating)
             self.snipping_window.append(float(0.5))
-            self.snipping_bool.append(True)
+            self.snipping_bool.append(default_snipping)
         
         self.set_scan_limits(scan_limits)
         self.set_participating()

@@ -35,7 +35,7 @@ from matplotlib.figure import Figure
 
 
 class Pulse_Generator():
-    def __init__(self, t0 = 0, t_end = 100, dt = 0.05, central_wavelength = 800, open_gui = True, initial_pulse = None, name = 'Pulse_generator') -> None:
+    def __init__(self,  t0 = 0, t_end = 100, dt = 0.05, central_wavelength = 800, open_gui = True, initial_pulse = None, name = 'Pulse_generator', spectrometer_control = None) -> None:
         self.pulse_list = []
         self.pulse_args = []
         self.pulse_pol = []
@@ -45,7 +45,7 @@ class Pulse_Generator():
         self.pulse_time_shift = []
         self.pulse_frequency_shift = []
         self.name = name
-        
+        self.spectrometer_control = spectrometer_control
         self.open_gui = open_gui
         
         if initial_pulse is None:
@@ -83,6 +83,7 @@ class Pulse_Generator():
         self.pulse_kinds = ['gaussian_time',
                             'gaussian_frequency',
                             'from file']
+    
         
         if self.open_gui:
             self.gui()
@@ -90,6 +91,9 @@ class Pulse_Generator():
     
     def save_pulse(self,name):
         self.save_name = self.pulse_object.save_pulse(save_name=name)
+    
+    def set_spectrometer_control(self, spectrometer_control):
+        self.spectrometer_control = spectrometer_control
     
     def update_previous_control(self):
         pass
@@ -273,6 +277,30 @@ class Pulse_Generator():
         self.add_pulse_phase(self.pulse_phases[index],index)
         self.add_pulse_time_shift(self.pulse_time_shift[index],index)
         self.add_pulse_frequency_shift(self.pulse_frequency_shift[index],index)
+    
+    def add_spectrometer_pulse(self,index):
+        self.spectrometer_control.update_measurement()
+        wavelength, intensity = self.spectrometer_control.get_wavelength_intensity()
+        if index is None:
+            pulse = pg.PulseGenerator(t0=self.t0, tend=self.t_end, dt=self.dt, central_wavelength=self.central_wavelength)
+        else:
+            pulse = self.pulse_list[index]
+            pulse.clear_all()
+        pulse.add_spectrum_frequ(unit = 'nm', sample_frequ=wavelength, sample_spectrum= intensity, power = None,plot=False)
+        
+        #pulse.shift_in_frequency(unit = 'nm', shift = self.pulse_frequency_shift[index])
+        #pulse.shift_in_time(self.pulse_time_shift[index])
+        pulse.set_pulse_power(1)
+        self.add_pulse(pulse,index)
+        self.add_pulse_kind('spectrometer_pulse',index)
+        self.add_pulse_args(None,index)
+        self.add_pulse_pol([1,0],index)
+        self.add_pulse_power(pulse.pulse_power,index)
+        self.add_pulse_phase([0,0],index)
+        self.add_pulse_time_shift(0,index)
+        self.add_pulse_frequency_shift(0,index)
+        
+        
         
         pass
     
@@ -494,7 +522,26 @@ class Pulse_Generator():
             
             
             self.add_pulse_kind_button.config(command= lambda: [self.pulse_list[index].shift_in_frequency(unit = 'nm', shift = float(self.frequency_shift_entry.get())),self.pulse_list[index].shift_in_time(float(self.time_shift_entry.get())),self.add_pulse_power(float(self.power_entry.get()),index),self.pulse_list[index].set_pulse_power(float(self.power_entry.get())),self.add_phase(self.pulse_list[index], float(self.phase_entry_wl.get()), [float(self.phase_entry[0].get()), float(self.phase_entry[1].get()), float(self.phase_entry[2].get()), float(self.phase_entry[3].get())]), self.update_gui(), self.add_initial_pulse(index=index)])
+        
+        elif pulse_kind == 'from spectrometer':
+            self.pulse_window.title('Add pulse from spectrometer')
             
+            self.add_spectrometer_pulse(index)
+            self.update_gui()
+            if index is None:
+                index = len(self.pulse_list)-1
+            tk.Label(self.pulse_window, text='Shift time (ps): ').grid(row=0, column=0)
+            self.time_shift_entry = tk.Entry(self.pulse_window)
+            self.time_shift_entry.insert(0, str(self.pulse_time_shift[index]))
+            self.time_shift_entry.grid(row=0, column=1)
+            
+            tk.Label(self.pulse_window, text='Shift frequency (nm): ').grid(row=1, column=0)
+            self.frequency_shift_entry = tk.Entry(self.pulse_window)
+            self.frequency_shift_entry.insert(0, str(self.pulse_frequency_shift[index]))
+            self.frequency_shift_entry.grid(row=1, column=1)
+            
+            self.add_pulse_kind_button.config(command= lambda: [self.pulse_list[index].shift_in_frequency(unit = 'nm', shift = float(self.frequency_shift_entry.get())),self.pulse_list[index].shift_in_time(float(self.time_shift_entry.get())),self.add_pulse_power(float(self.power_entry.get()),index),self.pulse_list[index].set_pulse_power(float(self.power_entry.get())),self.add_phase(self.pulse_list[index], float(self.phase_entry_wl.get()), [float(self.phase_entry[0].get()), float(self.phase_entry[1].get()), float(self.phase_entry[2].get()), float(self.phase_entry[3].get())]), self.update_gui(), self.add_spectrometer_pulse(index=index)])
+            pass
             # 
             
         if args is not None:
@@ -509,8 +556,9 @@ class Pulse_Generator():
     
     def gui(self):
         self.open_gui = True
+        if not hasattr(self, 'gui_window'):
+            self.gui_window = tk.Tk()
         
-        self.gui_window = tk.Tk()
         def close_gui():
             self.gui_window.destroy()
             print('Pulse Generator GUI closed')
@@ -593,6 +641,8 @@ class Pulse_Generator():
         self.add_pulse_button = tk.Button(self.gui_window, text='Add pulse', command=self.add_pulse_gui)
         self.add_pulse_button.grid(row=8, column=0)
         
+        if self.spectrometer_control is not None:
+            self.pulse_kinds.append('from spectrometer')
         self.add_pulse_kind_str = tk.StringVar()
         self.drop_down = ttk.Combobox(self.gui_window, values=self.pulse_kinds, textvariable=self.add_pulse_kind_str, width=50, state='readonly')
         self.drop_down.current(0)
