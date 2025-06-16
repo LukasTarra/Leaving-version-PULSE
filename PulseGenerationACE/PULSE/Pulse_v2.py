@@ -36,7 +36,7 @@ import time_delay_control as tdc
 import powermeter_control as pmc
 import wave_plate_control as wpc
 
-HBAR = 0.6582173
+HBAR = 0.6582173666
 
 class create_experiment():
     def __init__(self,path = None, name='Experiment', save = False) -> None:
